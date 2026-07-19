@@ -57,6 +57,9 @@ export async function SiteHeader() {
                   <span className="chip ml-1.5 bg-ink text-paper">Coach</span>
                 )}
               </span>
+              <Link className="btn px-2.5 py-1 text-xs" href="/account">
+                Settings
+              </Link>
               <form action={logout}>
                 <button className="btn px-2.5 py-1 text-xs" type="submit">
                   Log out
