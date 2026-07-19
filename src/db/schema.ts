@@ -297,6 +297,98 @@ export const weekendPlanLines = pgTable(
   (t) => [uniqueIndex("plan_player_once").on(t.planId, t.playerId)],
 );
 
+// Live game day (goal 4): one row per game run from the dugout dashboard.
+// Games belong to a schedule event (a game event, or a tournament that
+// contains several games).
+export type GameStatus = "setup" | "live" | "final";
+
+export const liveGames = pgTable("live_games", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  seasonId: uuid("season_id")
+    .notNull()
+    .references(() => seasons.id),
+  eventId: uuid("event_id")
+    .notNull()
+    .references(() => events.id),
+  label: text("label").notNull(),
+  opponent: text("opponent"),
+  status: text("status").$type<GameStatus>().notNull().default("setup"),
+  innings: integer("innings").notNull().default(6),
+  clockMinutes: integer("clock_minutes").notNull().default(90),
+  startedAt: timestamp("started_at"),
+  currentInning: integer("current_inning").notNull().default(1),
+  outs: integer("outs").notNull().default(0),
+  gameDate: date("game_date").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Where each player is, per inning. position is a fielding position or
+// "BENCH". A move in inning N rewrites innings N..end, so bench/played
+// innings fall straight out of this table.
+export const gameAssignments = pgTable(
+  "game_assignments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => liveGames.id),
+    inning: integer("inning").notNull(),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    position: text("position").notNull(), // Position | "BENCH"
+  },
+  (t) => [uniqueIndex("assignment_once").on(t.gameId, t.inning, t.playerId)],
+);
+
+export const battingOrders = pgTable(
+  "batting_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => liveGames.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    spot: integer("spot").notNull(),
+  },
+  (t) => [uniqueIndex("batting_spot_once").on(t.gameId, t.playerId)],
+);
+
+export const scoreLines = pgTable(
+  "score_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => liveGames.id),
+    inning: integer("inning").notNull(),
+    side: text("side").$type<"us" | "them">().notNull(),
+    runs: integer("runs").notNull().default(0),
+  },
+  (t) => [uniqueIndex("score_once").on(t.gameId, t.inning, t.side)],
+);
+
+// Pitches thrown per pitcher per inning. Daily totals and Pitch Smart rest
+// days are computed from this joined to the game date.
+export const pitchCounts = pgTable(
+  "pitch_counts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => liveGames.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    inning: integer("inning").notNull(),
+    pitches: integer("pitches").notNull().default(0),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("pitch_once").on(t.gameId, t.playerId, t.inning)],
+);
+
 // Family availability for potential tournament weekends (goal 7). Distinct
 // from event RSVPs: these are "could we play that day" answers used to pick
 // which tournaments to enter.

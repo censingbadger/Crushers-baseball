@@ -137,6 +137,43 @@ await page.fill("input[name='cue']", "Secret cue text");
 await page.click("button:has-text('Add note')");
 await page.locator("text=Secret cue text").first().waitFor({ timeout: 15000 });
 
+// Dugout dashboard: create a game (auto-seeded lineup), run game actions.
+await page.goto(BASE + "/games");
+await page.fill("#label", "Smoke Game");
+await page.click("button:has-text('Create game')");
+await page.waitForURL("**/game/**");
+const fieldText = await page.textContent("main");
+if (!fieldText?.includes("Batting order")) fail("dashboard missing batting order");
+// All nine positions filled by the solver seed (no dashed empty slots).
+const emptySlots = await page.locator("button:has-text('—')").count();
+if (emptySlots > 0) fail(`dashboard left ${emptySlots} field slots empty`);
+// Start the game, add pitches for the pitcher, score a run, take an out.
+await page.click("button:has-text('Start game')");
+await page.locator("button:has-text('Final')").waitFor({ timeout: 15000 });
+await page.click("button:has-text('+5')");
+await page.waitForTimeout(600);
+await page.click("button:has-text('+1 Crushers')");
+await page.waitForTimeout(600);
+const liveText = await page.textContent("main");
+if (!liveText?.includes("5 pitches")) fail("pitch count did not update");
+if (!liveText?.includes("1–0") && !liveText?.includes("1–0".normalize())) {
+  const score = await page.textContent("main");
+  if (!score?.match(/1\s*–\s*0/)) fail("score did not update");
+}
+// Move the pitcher to the bench (tap pitcher, tap bench button).
+const pitcherBtn = page.locator("button:has(span:text-is('P'))").first();
+await pitcherBtn.click();
+await page.click("button:has-text('send')");
+await page.waitForTimeout(800);
+const afterMove = await page.textContent("main");
+if (!afterMove?.includes("P is empty")) fail("bench move did not vacate P");
+// Cascade suggestion: fill P from the suggested bench candidates.
+await page.locator("p:has-text('P is empty') button").first().click();
+await page.waitForTimeout(800);
+const refilled = await page.textContent("main");
+if (refilled?.includes("P is empty")) fail("cascade suggestion did not fill P");
+await page.screenshot({ path: `${SHOTS}/10-dugout.png`, fullPage: true });
+
 // Coach progress view shows the trend.
 await page.goto(BASE + "/progress");
 const coachProgress = await page.textContent("main");

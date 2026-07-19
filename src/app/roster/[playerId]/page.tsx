@@ -287,7 +287,13 @@ export default async function PlayerEditPage({
             ))}
           </ul>
         )}
-        <form action={addDevNote} className="space-y-2 border-t-2 border-ink/20 pt-2">
+        {/* Keyed by note count so every field (incl. the shared checkbox)
+            resets after an add — uncontrolled inputs survive re-renders. */}
+        <form
+          key={notes.length}
+          action={addDevNote}
+          className="space-y-2 border-t-2 border-ink/20 pt-2"
+        >
           <input type="hidden" name="playerId" value={player.id} />
           <div className="grid grid-cols-2 gap-2">
             <select className="field" name="category" defaultValue="general">
