@@ -24,6 +24,21 @@ export type SignupKind = "helper" | "snacks" | "drinks";
 export const POSITIONS = ["P", "C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"] as const;
 export type Position = (typeof POSITIONS)[number];
 
+// Rating dimensions for the quick coach forms (goal 2): the ball-skills
+// plus the intangibles the team manager called out explicitly.
+export type RatingDimension =
+  | "hitting"
+  | "fielding"
+  | "arm"
+  | "speed"
+  | "iq"
+  | "dugout"
+  | "focus"
+  | "effort"
+  | "coachability";
+export type RatingContext = "practice" | "game" | "general";
+export type DevNoteCategory = "pitching" | "hitting" | "fielding" | "general";
+
 export const teams = pgTable("teams", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
@@ -188,6 +203,62 @@ export const positionRatings = pgTable("position_ratings", {
   createdByUserId: uuid("created_by_user_id").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// Quick coach ratings (goal 2): 1–5 per dimension, append-only so every
+// snapshot is dated and trends are visible. Tagged with context (practice /
+// game / general) and the rating coach's label, like the position matrix.
+export const playerRatings = pgTable("player_ratings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  seasonId: uuid("season_id")
+    .notNull()
+    .references(() => seasons.id),
+  playerId: uuid("player_id")
+    .notNull()
+    .references(() => players.id),
+  dimension: text("dimension").$type<RatingDimension>().notNull(),
+  rating: integer("rating").notNull(),
+  context: text("context").$type<RatingContext>().notNull().default("general"),
+  note: text("note"),
+  rater: text("rater").notNull(),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Development notes (goal 2): the "tendency → cue" pairs coaches keep.
+// Coach-only unless shared — shared cues surface on the parent progress
+// view (and the player pages in phase 7).
+export const devNotes = pgTable("dev_notes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  playerId: uuid("player_id")
+    .notNull()
+    .references(() => players.id),
+  category: text("category").$type<DevNoteCategory>().notNull().default("general"),
+  tendency: text("tendency").notNull(),
+  cue: text("cue").notNull(),
+  shared: boolean("shared").notNull().default(false),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Aspirational goals (goal 2): per player per season. Desired positions and
+// season goals are shared with the family by design; coach notes are not.
+export const aspirations = pgTable(
+  "aspirations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => seasons.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    desiredPositions: text("desired_positions"),
+    seasonGoals: text("season_goals"),
+    coachNotes: text("coach_notes"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("aspiration_once").on(t.seasonId, t.playerId)],
+);
 
 // Weekend innings allocation (goal 3): plan each player's innings across a
 // tournament weekend before drawing per-game lineups. Mirrors the coach's
