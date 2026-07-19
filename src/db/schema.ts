@@ -24,6 +24,21 @@ export type SignupKind = "helper" | "snacks" | "drinks";
 export const POSITIONS = ["P", "C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"] as const;
 export type Position = (typeof POSITIONS)[number];
 
+// Rating dimensions for the quick coach forms (goal 2): the ball-skills
+// plus the intangibles the team manager called out explicitly.
+export type RatingDimension =
+  | "hitting"
+  | "fielding"
+  | "arm"
+  | "speed"
+  | "iq"
+  | "dugout"
+  | "focus"
+  | "effort"
+  | "coachability";
+export type RatingContext = "practice" | "game" | "general";
+export type DevNoteCategory = "pitching" | "hitting" | "fielding" | "general";
+
 export const teams = pgTable("teams", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
@@ -189,6 +204,62 @@ export const positionRatings = pgTable("position_ratings", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Quick coach ratings (goal 2): 1–5 per dimension, append-only so every
+// snapshot is dated and trends are visible. Tagged with context (practice /
+// game / general) and the rating coach's label, like the position matrix.
+export const playerRatings = pgTable("player_ratings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  seasonId: uuid("season_id")
+    .notNull()
+    .references(() => seasons.id),
+  playerId: uuid("player_id")
+    .notNull()
+    .references(() => players.id),
+  dimension: text("dimension").$type<RatingDimension>().notNull(),
+  rating: integer("rating").notNull(),
+  context: text("context").$type<RatingContext>().notNull().default("general"),
+  note: text("note"),
+  rater: text("rater").notNull(),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Development notes (goal 2): the "tendency → cue" pairs coaches keep.
+// Coach-only unless shared — shared cues surface on the parent progress
+// view (and the player pages in phase 7).
+export const devNotes = pgTable("dev_notes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  playerId: uuid("player_id")
+    .notNull()
+    .references(() => players.id),
+  category: text("category").$type<DevNoteCategory>().notNull().default("general"),
+  tendency: text("tendency").notNull(),
+  cue: text("cue").notNull(),
+  shared: boolean("shared").notNull().default(false),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Aspirational goals (goal 2): per player per season. Desired positions and
+// season goals are shared with the family by design; coach notes are not.
+export const aspirations = pgTable(
+  "aspirations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => seasons.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    desiredPositions: text("desired_positions"),
+    seasonGoals: text("season_goals"),
+    coachNotes: text("coach_notes"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("aspiration_once").on(t.seasonId, t.playerId)],
+);
+
 // Weekend innings allocation (goal 3): plan each player's innings across a
 // tournament weekend before drawing per-game lineups. Mirrors the coach's
 // planning spreadsheet: two field positions plus pitching innings per
@@ -224,6 +295,98 @@ export const weekendPlanLines = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("plan_player_once").on(t.planId, t.playerId)],
+);
+
+// Live game day (goal 4): one row per game run from the dugout dashboard.
+// Games belong to a schedule event (a game event, or a tournament that
+// contains several games).
+export type GameStatus = "setup" | "live" | "final";
+
+export const liveGames = pgTable("live_games", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  seasonId: uuid("season_id")
+    .notNull()
+    .references(() => seasons.id),
+  eventId: uuid("event_id")
+    .notNull()
+    .references(() => events.id),
+  label: text("label").notNull(),
+  opponent: text("opponent"),
+  status: text("status").$type<GameStatus>().notNull().default("setup"),
+  innings: integer("innings").notNull().default(6),
+  clockMinutes: integer("clock_minutes").notNull().default(90),
+  startedAt: timestamp("started_at"),
+  currentInning: integer("current_inning").notNull().default(1),
+  outs: integer("outs").notNull().default(0),
+  gameDate: date("game_date").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Where each player is, per inning. position is a fielding position or
+// "BENCH". A move in inning N rewrites innings N..end, so bench/played
+// innings fall straight out of this table.
+export const gameAssignments = pgTable(
+  "game_assignments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => liveGames.id),
+    inning: integer("inning").notNull(),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    position: text("position").notNull(), // Position | "BENCH"
+  },
+  (t) => [uniqueIndex("assignment_once").on(t.gameId, t.inning, t.playerId)],
+);
+
+export const battingOrders = pgTable(
+  "batting_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => liveGames.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    spot: integer("spot").notNull(),
+  },
+  (t) => [uniqueIndex("batting_spot_once").on(t.gameId, t.playerId)],
+);
+
+export const scoreLines = pgTable(
+  "score_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => liveGames.id),
+    inning: integer("inning").notNull(),
+    side: text("side").$type<"us" | "them">().notNull(),
+    runs: integer("runs").notNull().default(0),
+  },
+  (t) => [uniqueIndex("score_once").on(t.gameId, t.inning, t.side)],
+);
+
+// Pitches thrown per pitcher per inning. Daily totals and Pitch Smart rest
+// days are computed from this joined to the game date.
+export const pitchCounts = pgTable(
+  "pitch_counts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => liveGames.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    inning: integer("inning").notNull(),
+    pitches: integer("pitches").notNull().default(0),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("pitch_once").on(t.gameId, t.playerId, t.inning)],
 );
 
 // Family availability for potential tournament weekends (goal 7). Distinct

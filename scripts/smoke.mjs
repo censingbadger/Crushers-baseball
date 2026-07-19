@@ -105,6 +105,82 @@ await page.waitForURL("**/roster/**");
 const editText = await page.textContent("main");
 if (!editText?.includes("Careful zone")) fail("player edit page incomplete");
 
+// Rate Milo twice to build a trend (second save bumps hitting 4 -> 5).
+await page.goto(BASE + "/rate");
+await page.click("a:has-text('Milo Vance')");
+await page.waitForURL("**/rate/**");
+await page.click("label:has(input[name='dim_hitting'][value='4'])");
+await page.click("label:has(input[name='dim_dugout'][value='5'])");
+await page.click("button:has-text('Save ratings')");
+await page.waitForURL("**/rate?done=**");
+await page.click("a:has-text('Milo Vance')");
+await page.waitForURL("**/rate/**");
+await page.click("label:has(input[name='dim_hitting'][value='5'])");
+await page.click("button:has-text('Save ratings')");
+await page.waitForURL("**/rate?done=**");
+
+// Aspirations and development notes on Milo's player page.
+await page.goto(BASE + "/roster");
+await page.click("a:has-text('Milo Vance')");
+await page.waitForURL("**/roster/**");
+await page.fill("#desiredPositions", "SS, P");
+await page.fill("#seasonGoals", "Make the summer all-star team");
+await page.click("button:has-text('Save goals')");
+await page.waitForTimeout(700);
+await page.fill("input[name='tendency']", "Drops glove on backhand");
+await page.fill("input[name='cue']", "Quick glove to the dirt");
+await page.check("input[name='shared']");
+await page.click("button:has-text('Add note')");
+await page.locator("text=Quick glove to the dirt").first().waitFor({ timeout: 15000 });
+await page.fill("input[name='tendency']", "Coach-only observation");
+await page.fill("input[name='cue']", "Secret cue text");
+await page.click("button:has-text('Add note')");
+await page.locator("text=Secret cue text").first().waitFor({ timeout: 15000 });
+
+// Dugout dashboard: create a game (auto-seeded lineup), run game actions.
+await page.goto(BASE + "/games");
+await page.fill("#label", "Smoke Game");
+await page.click("button:has-text('Create game')");
+await page.waitForURL("**/game/**");
+const fieldText = await page.textContent("main");
+if (!fieldText?.includes("Batting order")) fail("dashboard missing batting order");
+// All nine positions filled by the solver seed (no dashed empty slots).
+const emptySlots = await page.locator("button:has-text('—')").count();
+if (emptySlots > 0) fail(`dashboard left ${emptySlots} field slots empty`);
+// Start the game, add pitches for the pitcher, score a run, take an out.
+await page.click("button:has-text('Start game')");
+await page.locator("button:has-text('Final')").waitFor({ timeout: 15000 });
+await page.click("button:has-text('+5')");
+await page.waitForTimeout(600);
+await page.click("button:has-text('+1 Crushers')");
+await page.waitForTimeout(600);
+const liveText = await page.textContent("main");
+if (!liveText?.includes("5 pitches")) fail("pitch count did not update");
+if (!liveText?.includes("1–0") && !liveText?.includes("1–0".normalize())) {
+  const score = await page.textContent("main");
+  if (!score?.match(/1\s*–\s*0/)) fail("score did not update");
+}
+// Move the pitcher to the bench (tap pitcher, tap bench button).
+const pitcherBtn = page.locator("button:has(span:text-is('P'))").first();
+await pitcherBtn.click();
+await page.click("button:has-text('send')");
+await page.waitForTimeout(800);
+const afterMove = await page.textContent("main");
+if (!afterMove?.includes("P is empty")) fail("bench move did not vacate P");
+// Cascade suggestion: fill P from the suggested bench candidates.
+await page.locator("p:has-text('P is empty') button").first().click();
+await page.waitForTimeout(800);
+const refilled = await page.textContent("main");
+if (refilled?.includes("P is empty")) fail("cascade suggestion did not fill P");
+await page.screenshot({ path: `${SHOTS}/10-dugout.png`, fullPage: true });
+
+// Coach progress view shows the trend.
+await page.goto(BASE + "/progress");
+const coachProgress = await page.textContent("main");
+if (!coachProgress?.includes("Hitting")) fail("progress missing rated dimension");
+if (!coachProgress?.includes("4 · 5")) fail("progress missing rating trend points");
+await page.screenshot({ path: `${SHOTS}/09-progress.png`, fullPage: true });
+
 // Log out, log in as parent, RSVP for own player on the next practice.
 await page.click("header form button");
 await page.waitForURL("**/login");
@@ -119,6 +195,21 @@ if (nav?.includes("Import")) fail("parent sees coach-only nav");
 await page.goto(BASE + "/roster");
 const parentRoster = await page.textContent("main");
 if (parentRoster?.includes("Perry Vance")) fail("parent sees guardian contact info");
+
+// Parent progress: own player only, shared content only.
+await page.goto(BASE + "/progress");
+const parentProgress = await page.textContent("main");
+if (!parentProgress?.includes("Milo Vance")) fail("parent progress missing own player");
+if (parentProgress?.includes("Eli Brooks")) fail("parent progress shows other players");
+if (!parentProgress?.includes("Make the summer all-star team")) {
+  fail("parent progress missing shared season goals");
+}
+if (!parentProgress?.includes("Quick glove to the dirt")) {
+  fail("parent progress missing shared cue");
+}
+if (parentProgress?.includes("Secret cue text")) {
+  fail("parent progress leaked a coach-only note");
+}
 
 // Open the first upcoming event and flip Milo to Maybe.
 await page.goto(BASE + "/schedule");

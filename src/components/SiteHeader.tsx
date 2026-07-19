@@ -39,8 +39,17 @@ export async function SiteHeader() {
               <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/availability">
                 Availability
               </Link>
+              <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/progress">
+                Progress
+              </Link>
               {user.role === "coach" && (
                 <>
+                  <Link className="rounded px-2 py-1 font-extrabold text-team-orange-dark hover:bg-team-blue-light" href="/games">
+                    Game day
+                  </Link>
+                  <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/rate">
+                    Rate
+                  </Link>
                   <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/matrix">
                     Matrix
                   </Link>
