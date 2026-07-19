@@ -13,7 +13,7 @@ export default async function NewEventPage({
     <div className="mx-auto max-w-lg">
       <h1 className="mb-4 text-2xl font-extrabold">New event</h1>
       {error && (
-        <p className="mb-3 rounded border-2 border-ink bg-team-orange px-3 py-2 text-sm font-semibold text-paper">
+        <p className="mb-3 rounded border border-line bg-team-orange px-3 py-2 text-sm font-semibold text-paper">
           Check the fields — the event couldn't be saved.
         </p>
       )}

@@ -455,6 +455,37 @@ export const pitchingLines = pgTable(
   (t) => [uniqueIndex("pitching_line_once").on(t.statGameId, t.playerId)],
 );
 
+// Monthly parent reports (goal 6). Drafted by Claude (or a deterministic
+// template when no API key is configured) from family-shareable data only,
+// then edited/approved by a coach. Parents never see anything before
+// status = "published". One report per (season, player, month).
+export type ReportStatus = "draft" | "published";
+
+export const reports = pgTable(
+  "reports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => seasons.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    month: text("month").notNull(), // ISO "2026-07"
+    status: text("status").$type<ReportStatus>().notNull().default("draft"),
+    draftText: text("draft_text").notNull(),
+    // Coach-edited version; falls back to draftText until first save.
+    finalText: text("final_text"),
+    draftedBy: text("drafted_by").notNull(), // model id or "template"
+    createdByUserId: uuid("created_by_user_id").references(() => users.id),
+    approvedByUserId: uuid("approved_by_user_id").references(() => users.id),
+    publishedAt: timestamp("published_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("report_once").on(t.seasonId, t.playerId, t.month)],
+);
+
 // Family availability for potential tournament weekends (goal 7). Distinct
 // from event RSVPs: these are "could we play that day" answers used to pick
 // which tournaments to enter.

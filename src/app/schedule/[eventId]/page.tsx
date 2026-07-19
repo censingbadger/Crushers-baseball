@@ -50,7 +50,7 @@ export default async function EventPage({
   return (
     <div className="space-y-6">
       <div>
-        <span className="rounded border-2 border-ink bg-team-blue px-2 py-0.5 text-xs font-bold uppercase">
+        <span className="rounded border border-line bg-team-blue px-2 py-0.5 text-xs font-bold uppercase">
           {EVENT_TYPE_LABEL[event.type]}
         </span>
         <h1 className="mt-2 text-2xl font-extrabold">
@@ -79,7 +79,7 @@ export default async function EventPage({
         <h2 className="mb-2 text-lg font-bold">Who's in</h2>
         <table className="w-full min-w-[420px] text-sm">
           <thead>
-            <tr className="border-b-2 border-ink text-left">
+            <tr className="border-b border-line-strong text-left">
               <th className="py-1 pr-2">Player</th>
               <th className="py-1 pr-2">Answer</th>
               <th className="py-1">Update</th>
@@ -90,7 +90,7 @@ export default async function EventPage({
               const status = rsvps.get(p.playerId);
               const canEdit = editable.has(p.playerId);
               return (
-                <tr key={p.playerId} className="border-b border-ink/10">
+                <tr key={p.playerId} className="border-b border-line">
                   <td className="py-1.5 pr-2 font-semibold">
                     {p.firstName} {p.lastName}
                     {p.status !== "full" && (
@@ -102,7 +102,7 @@ export default async function EventPage({
                   <td className="py-1.5 pr-2">
                     {status ? (
                       <span
-                        className={`rounded border border-ink px-1.5 py-0.5 text-xs font-bold ${RSVP_STYLES[status]}`}
+                        className={`rounded border border-line px-1.5 py-0.5 text-xs font-bold ${RSVP_STYLES[status]}`}
                       >
                         {RSVP_LABEL[status]}
                       </span>
@@ -120,7 +120,7 @@ export default async function EventPage({
                             <input type="hidden" name="status" value={s} />
                             <button
                               type="submit"
-                              className={`rounded border border-ink px-2 py-0.5 text-xs font-semibold hover:bg-team-blue-light ${
+                              className={`rounded border border-line px-2 py-0.5 text-xs font-semibold hover:bg-team-blue-light ${
                                 status === s ? RSVP_STYLES[s] : "bg-paper"
                               }`}
                             >
@@ -144,7 +144,7 @@ export default async function EventPage({
           <ul className="mb-3 space-y-1 text-sm">
             {signups.map((s) => (
               <li key={s.id} className="flex items-center gap-2">
-                <span className="rounded border border-ink bg-team-blue-light px-1.5 py-0.5 text-xs font-bold">
+                <span className="rounded border border-line bg-team-blue-light px-1.5 py-0.5 text-xs font-bold">
                   {SIGNUP_LABEL[s.kind] ?? s.kind}
                 </span>
                 <span className="font-semibold">{s.guardianName}</span>

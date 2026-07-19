@@ -77,7 +77,7 @@ export default async function StatGamePage({
           {game.source === "gc" ? "GameChanger snapshot (read-only)" : "manual box score"}
         </p>
         {saved && (
-          <p className="mt-2 rounded border-2 border-ink bg-green-600 px-3 py-1.5 text-sm font-semibold text-white">
+          <p className="mt-2 rounded border border-line bg-green-600 px-3 py-1.5 text-sm font-semibold text-white">
             ✓ Box score saved.
           </p>
         )}
@@ -94,7 +94,7 @@ export default async function StatGamePage({
           </div>
           <table className="w-full min-w-[720px] text-sm" style={{ fontVariantNumeric: "tabular-nums" }}>
             <thead>
-              <tr className="border-b-2 border-ink text-center">
+              <tr className="border-b border-line-strong text-center">
                 <th className="py-1 text-left">Player</th>
                 {BAT_COLS.map((c) => <th key={c.key} className="px-1">{c.label}</th>)}
               </tr>
@@ -103,7 +103,7 @@ export default async function StatGamePage({
               {roster.map((p) => {
                 const line = bByPlayer.get(p.playerId) as Record<string, unknown> | undefined;
                 return (
-                  <tr key={p.playerId} className="border-b border-ink/10 text-center">
+                  <tr key={p.playerId} className="border-b border-line text-center">
                     <td className="whitespace-nowrap py-1 text-left font-semibold">
                       {p.firstName} {p.lastName}
                       {editable && <input type="hidden" name="playerId" value={p.playerId} />}
@@ -134,7 +134,7 @@ export default async function StatGamePage({
           <h2 className="mb-2 text-lg font-bold">Pitching</h2>
           <table className="w-full min-w-[560px] text-sm" style={{ fontVariantNumeric: "tabular-nums" }}>
             <thead>
-              <tr className="border-b-2 border-ink text-center">
+              <tr className="border-b border-line-strong text-center">
                 <th className="py-1 text-left">Player</th>
                 <th className="px-1">IP</th>
                 {PIT_COLS.map((c) => <th key={c.key} className="px-1">{c.label}</th>)}
@@ -144,7 +144,7 @@ export default async function StatGamePage({
               {roster.map((p) => {
                 const line = pByPlayer.get(p.playerId);
                 return (
-                  <tr key={p.playerId} className="border-b border-ink/10 text-center">
+                  <tr key={p.playerId} className="border-b border-line text-center">
                     <td className="whitespace-nowrap py-1 text-left font-semibold">
                       {p.firstName} {p.lastName}
                     </td>

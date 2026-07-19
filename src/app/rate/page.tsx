@@ -42,7 +42,7 @@ export default async function RateIndexPage({
         </p>
       </div>
       {donePlayer && (
-        <p className="rounded border-2 border-ink bg-green-600 px-3 py-2 text-sm font-semibold text-white">
+        <p className="rounded border border-line bg-green-600 px-3 py-2 text-sm font-semibold text-white">
           ✓ Saved ratings for {donePlayer.firstName} {donePlayer.lastName}. Next player?
         </p>
       )}

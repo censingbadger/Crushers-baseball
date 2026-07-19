@@ -28,7 +28,7 @@ export default async function RosterPage() {
       <div className="card overflow-x-auto p-4">
         <table className="w-full min-w-[480px] text-sm">
           <thead>
-            <tr className="border-b-2 border-ink text-left">
+            <tr className="border-b border-line-strong text-left">
               <th className="py-1 pr-2">#</th>
               <th className="py-1 pr-2">Player</th>
               <th className="py-1 pr-2">Status</th>
@@ -40,7 +40,7 @@ export default async function RosterPage() {
           </thead>
           <tbody>
             {roster.map((p) => (
-              <tr key={p.playerId} className="border-b border-ink/10 align-top">
+              <tr key={p.playerId} className="border-b border-line align-top">
                 <td className="py-1.5 pr-2 font-extrabold text-team-blue-dark">
                   {p.jerseyNumber ?? "—"}
                 </td>
@@ -57,15 +57,15 @@ export default async function RosterPage() {
                 </td>
                 <td className="py-1.5 pr-2">
                   {p.status === "practice" ? (
-                    <span className="rounded border border-ink bg-team-blue-light px-1.5 py-0.5 text-xs font-bold">
+                    <span className="rounded border border-line bg-team-blue-light px-1.5 py-0.5 text-xs font-bold">
                       Practice
                     </span>
                   ) : p.status === "hopeful" ? (
-                    <span className="rounded border border-ink bg-amber-300 px-1.5 py-0.5 text-xs font-bold">
+                    <span className="rounded border border-line bg-amber-300 px-1.5 py-0.5 text-xs font-bold">
                       Hopeful
                     </span>
                   ) : (
-                    <span className="rounded border border-ink bg-team-orange px-1.5 py-0.5 text-xs font-bold text-paper">
+                    <span className="rounded border border-line bg-team-orange px-1.5 py-0.5 text-xs font-bold text-paper">
                       Full
                     </span>
                   )}

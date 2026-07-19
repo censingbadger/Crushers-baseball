@@ -177,7 +177,7 @@ export default async function PlayerEditPage({
             <tbody>
               {trends.map(({ dim, trend }) =>
                 trend.latest === null ? null : (
-                  <tr key={dim.key} className="border-b border-ink/10">
+                  <tr key={dim.key} className="border-b border-line">
                     <td className="py-1 pr-2">{dim.label}</td>
                     <td className="py-1 pr-2 text-right font-bold">
                       {trend.latest}
@@ -253,10 +253,10 @@ export default async function PlayerEditPage({
         {notes.length > 0 && (
           <ul className="space-y-2 text-sm">
             {notes.map((n) => (
-              <li key={n.id} className="rounded border-2 border-ink/20 p-2">
+              <li key={n.id} className="rounded border border-line/20 p-2">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className="rounded border border-ink bg-team-blue-light px-1 text-[10px] font-bold uppercase">
+                    <span className="rounded border border-line bg-team-blue-light px-1 text-[10px] font-bold uppercase">
                       {n.category}
                     </span>{" "}
                     <span className="text-neutral-700">{n.tendency}</span>
@@ -266,7 +266,7 @@ export default async function PlayerEditPage({
                     <form action={toggleNoteShared}>
                       <input type="hidden" name="id" value={n.id} />
                       <button
-                        className={`rounded border border-ink px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                        className={`rounded border border-line px-1.5 py-0.5 text-[10px] font-bold uppercase ${
                           n.shared ? "bg-green-600 text-white" : "bg-paper"
                         }`}
                         type="submit"
@@ -292,7 +292,7 @@ export default async function PlayerEditPage({
         <form
           key={notes.length}
           action={addDevNote}
-          className="space-y-2 border-t-2 border-ink/20 pt-2"
+          className="space-y-2 border-t border-line/20 pt-2"
         >
           <input type="hidden" name="playerId" value={player.id} />
           <div className="grid grid-cols-2 gap-2">

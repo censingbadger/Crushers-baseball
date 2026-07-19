@@ -102,7 +102,7 @@ export default async function StatsPage() {
         ) : (
           <table className="w-full min-w-[640px] text-sm" style={{ fontVariantNumeric: "tabular-nums" }}>
             <thead>
-              <tr className="border-b-2 border-ink text-right">
+              <tr className="border-b border-line-strong text-right">
                 <th className="py-1 text-left">Player</th>
                 <th className="px-1.5">AB</th><th className="px-1.5">R</th>
                 <th className="px-1.5">H</th><th className="px-1.5">2B</th>
@@ -116,7 +116,7 @@ export default async function StatsPage() {
             </thead>
             <tbody>
               {batters.map(({ p, totals, rates }) => (
-                <tr key={p.playerId} className="border-b border-ink/10 text-right">
+                <tr key={p.playerId} className="border-b border-line text-right">
                   <td className="py-1 text-left font-semibold">
                     {p.firstName} {p.lastName}
                   </td>
@@ -148,7 +148,7 @@ export default async function StatsPage() {
         ) : (
           <table className="w-full min-w-[520px] text-sm" style={{ fontVariantNumeric: "tabular-nums" }}>
             <thead>
-              <tr className="border-b-2 border-ink text-right">
+              <tr className="border-b border-line-strong text-right">
                 <th className="py-1 text-left">Player</th>
                 <th className="px-1.5">IP</th><th className="px-1.5">BF</th>
                 <th className="px-1.5">Pitches</th><th className="px-1.5">H</th>
@@ -160,7 +160,7 @@ export default async function StatsPage() {
             </thead>
             <tbody>
               {pitchers.map(({ p, totals, rates }) => (
-                <tr key={p.playerId} className="border-b border-ink/10 text-right">
+                <tr key={p.playerId} className="border-b border-line text-right">
                   <td className="py-1 text-left font-semibold">
                     {p.firstName} {p.lastName}
                   </td>
@@ -190,10 +190,10 @@ export default async function StatsPage() {
         {games.length === 0 ? (
           <p className="text-sm text-neutral-600">None yet.</p>
         ) : (
-          <ul className="divide-y-2 divide-ink/10">
+          <ul className="divide-y divide-line">
             {games.map((g) => (
               <li key={g.id} className="flex flex-wrap items-center gap-2 py-2">
-                <span className={`rounded border-2 border-ink px-1.5 py-0.5 text-xs font-bold uppercase ${g.source === "gc" ? "bg-team-blue-light" : "bg-team-orange text-paper"}`}>
+                <span className={`chip ${g.source === "gc" ? "bg-team-blue-light" : "bg-team-orange text-paper"}`}>
                   {g.source === "gc" ? "GC" : "Manual"}
                 </span>
                 <Link href={`/stats/game/${g.id}`} className="min-w-0 flex-1 basis-52 font-semibold underline-offset-2 hover:underline">

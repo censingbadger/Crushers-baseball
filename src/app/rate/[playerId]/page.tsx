@@ -43,7 +43,7 @@ export default async function RatePlayerPage({
           Rate {player.firstName} {player.lastName}
         </h1>
         {(aspiration?.seasonGoals || aspiration?.desiredPositions) && (
-          <div className="mt-2 rounded border-2 border-ink bg-team-blue-light p-2 text-sm">
+          <div className="mt-2 rounded border border-line bg-team-blue-light p-2 text-sm">
             <span className="font-bold">Working toward:</span>{" "}
             {aspiration.seasonGoals}
             {aspiration.desiredPositions && (
@@ -61,7 +61,7 @@ export default async function RatePlayerPage({
         {DIMENSIONS.map((dim, i) => (
           <div key={dim.key}>
             {i === 5 && (
-              <p className="mb-2 border-t-2 border-ink/20 pt-3 text-xs font-bold uppercase tracking-wide text-team-orange-dark">
+              <p className="mb-2 border-t border-line/20 pt-3 text-xs font-bold uppercase tracking-wide text-team-orange-dark">
                 The intangibles
               </p>
             )}
@@ -75,7 +75,7 @@ export default async function RatePlayerPage({
                     value={v}
                     className="peer sr-only"
                   />
-                  <span className="block cursor-pointer rounded border-2 border-ink py-1.5 text-center font-bold peer-checked:bg-team-orange peer-checked:text-paper hover:bg-team-blue-light">
+                  <span className="block cursor-pointer rounded border border-line py-1.5 text-center font-bold peer-checked:bg-team-orange peer-checked:text-paper hover:bg-team-blue-light">
                     {v}
                   </span>
                 </label>
@@ -84,7 +84,7 @@ export default async function RatePlayerPage({
           </div>
         ))}
 
-        <div className="grid grid-cols-2 gap-3 border-t-2 border-ink/20 pt-3">
+        <div className="grid grid-cols-2 gap-3 border-t border-line/20 pt-3">
           <div>
             <label className="label" htmlFor="context">Context</label>
             <select className="field" id="context" name="context" defaultValue="practice">

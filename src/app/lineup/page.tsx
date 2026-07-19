@@ -193,7 +193,7 @@ export default async function LineupPage({
               {solution.warnings.map((w, i) => (
                 <li
                   key={i}
-                  className="rounded border-2 border-ink bg-amber-50 px-2 py-1 text-xs font-semibold"
+                  className="rounded border border-line bg-amber-50 px-2 py-1 text-xs font-semibold"
                 >
                   ⚠ {w}
                 </li>
@@ -206,14 +206,14 @@ export default async function LineupPage({
                 {POSITIONS.map((pos) => {
                   const a = solution.assignments[pos];
                   return (
-                    <tr key={pos} className="border-b border-ink/10">
+                    <tr key={pos} className="border-b border-line">
                       <td className="w-10 py-1 font-extrabold text-team-blue-dark">{pos}</td>
                       <td className="py-1 font-semibold">
                         {a ? (
                           <>
                             {a.name}
                             {a.pinned && (
-                              <span className="ml-1 rounded border border-ink bg-team-orange px-1 text-[10px] font-bold uppercase text-paper">
+                              <span className="ml-1 rounded border border-line bg-team-orange px-1 text-[10px] font-bold uppercase text-paper">
                                 pinned
                               </span>
                             )}

@@ -127,7 +127,7 @@ export default async function WeekendPage({
               </div>
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
-                  <tr className="border-b-2 border-ink text-left">
+                  <tr className="border-b border-line-strong text-left">
                     <th className="py-1 pr-2">Player</th>
                     <th className="py-1 pr-2">Slot A</th>
                     <th className="py-1 pr-2">Inn</th>
@@ -162,7 +162,7 @@ export default async function WeekendPage({
                       />
                     );
                     return (
-                      <tr key={p.playerId} className="border-b border-ink/10">
+                      <tr key={p.playerId} className="border-b border-line">
                         <td className="whitespace-nowrap py-1 pr-2 font-semibold">
                           {p.firstName} {p.lastName}
                           <input type="hidden" name="playerId" value={p.playerId} />
@@ -199,11 +199,11 @@ export default async function WeekendPage({
             <h2 className="mb-2 text-lg font-bold">
               Position coverage{" "}
               {balance.allOk ? (
-                <span className="ml-1 rounded border-2 border-ink bg-green-600 px-2 py-0.5 text-xs font-bold text-white">
+                <span className="ml-1 rounded border border-line bg-green-600 px-2 py-0.5 text-xs font-bold text-white">
                   BALANCED
                 </span>
               ) : (
-                <span className="ml-1 rounded border-2 border-ink bg-amber-400 px-2 py-0.5 text-xs font-bold">
+                <span className="ml-1 rounded border border-line bg-amber-400 px-2 py-0.5 text-xs font-bold">
                   IN PROGRESS
                 </span>
               )}
@@ -212,7 +212,7 @@ export default async function WeekendPage({
               {balance.positions.map((pos) => (
                 <div
                   key={pos.position}
-                  className={`rounded border-2 border-ink px-2 py-1 text-center text-sm font-bold ${
+                  className={`rounded border border-line px-2 py-1 text-center text-sm font-bold ${
                     pos.ok
                       ? "bg-green-600 text-white"
                       : pos.supplied > pos.needed
@@ -227,7 +227,7 @@ export default async function WeekendPage({
                 </div>
               ))}
               <div
-                className={`rounded border-2 border-ink px-2 py-1 text-center text-sm font-bold ${
+                className={`rounded border border-line px-2 py-1 text-center text-sm font-bold ${
                   balance.benchSupplied === balance.benchNeeded
                     ? "bg-green-600 text-white"
                     : "bg-paper"
@@ -242,7 +242,7 @@ export default async function WeekendPage({
             {balance.warnings.length > 0 && (
               <ul className="mt-3 space-y-1">
                 {[...new Set(balance.warnings)].map((w, i) => (
-                  <li key={i} className="rounded border-2 border-ink bg-amber-50 px-2 py-1 text-xs font-semibold">
+                  <li key={i} className="rounded border border-line bg-amber-50 px-2 py-1 text-xs font-semibold">
                     ⚠ {w}
                   </li>
                 ))}

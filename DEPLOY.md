@@ -24,6 +24,10 @@ One-time setup, roughly ten minutes. You need only your GitHub account.
 - `AUTH_SECRET` — any long random string (e.g. run
   `openssl rand -base64 32`). This signs login cookies; required in
   production.
+- `ANTHROPIC_API_KEY` — optional. With it, monthly parent reports are
+  drafted by Claude; without it, the built-in letter template writes the
+  first drafts. Either way a coach reviews and publishes before families
+  see anything. Keys come from <https://console.anthropic.com>.
 
 Redeploy after adding it (Deploys → Trigger deploy).
 
