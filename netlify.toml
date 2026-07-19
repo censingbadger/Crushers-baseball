@@ -2,6 +2,12 @@
   command = "npm run build"
   publish = ".next"
 
+[build.environment]
+  # Next 16 requires Node >= 20.9; pin the function runtime explicitly so
+  # the server handler never lands on an older Lambda runtime.
+  AWS_LAMBDA_JS_RUNTIME = "nodejs22.x"
+  NODE_VERSION = "22"
+
 # The app runs its drizzle migrations at boot, so the SQL files must ship
 # inside the serverless function bundle — without this every database
 # startup crashes with ENOENT on the live site.
