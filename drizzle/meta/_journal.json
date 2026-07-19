@@ -15,6 +15,13 @@
       "when": 1784479052847,
       "tag": "0001_petite_shriek",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784479835104,
+      "tag": "0002_easy_ogun",
+      "breakpoints": true
     }
   ]
 }

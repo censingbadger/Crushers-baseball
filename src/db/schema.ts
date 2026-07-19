@@ -189,6 +189,43 @@ export const positionRatings = pgTable("position_ratings", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Weekend innings allocation (goal 3): plan each player's innings across a
+// tournament weekend before drawing per-game lineups. Mirrors the coach's
+// planning spreadsheet: two field positions plus pitching innings per
+// player; bench is derived. One plan per tournament event.
+export const weekendPlans = pgTable("weekend_plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id")
+    .notNull()
+    .unique()
+    .references(() => events.id),
+  games: integer("games").notNull().default(4),
+  inningsPerGame: integer("innings_per_game").notNull().default(6),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const weekendPlanLines = pgTable(
+  "weekend_plan_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => weekendPlans.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    posA: text("pos_a").$type<Position>(),
+    inningsA: integer("innings_a").notNull().default(0),
+    posB: text("pos_b").$type<Position>(),
+    inningsB: integer("innings_b").notNull().default(0),
+    pitchInnings: integer("pitch_innings").notNull().default(0),
+    pitchMaxPerGame: integer("pitch_max_per_game"),
+    pitchGames: text("pitch_games"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("plan_player_once").on(t.planId, t.playerId)],
+);
+
 // Family availability for potential tournament weekends (goal 7). Distinct
 // from event RSVPs: these are "could we play that day" answers used to pick
 // which tournaments to enter.
