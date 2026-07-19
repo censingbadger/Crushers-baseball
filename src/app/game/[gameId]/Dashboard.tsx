@@ -16,18 +16,82 @@ import { BENCH } from "@/lib/gameday";
 
 const POSITIONS = ["P", "C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"] as const;
 
-// Field slot placement, percent-based on a 4:3 field.
+// Chip anchors in percent of the 4:3 field, matching the SVG geometry
+// below (home plate at (50,68) in a 100x75 viewBox).
 const SLOT_POS: Record<string, { top: string; left: string }> = {
-  CF: { top: "8%", left: "50%" },
-  LF: { top: "18%", left: "18%" },
-  RF: { top: "18%", left: "82%" },
-  SS: { top: "38%", left: "35%" },
-  "2B": { top: "38%", left: "65%" },
-  "3B": { top: "55%", left: "22%" },
-  "1B": { top: "55%", left: "78%" },
-  P: { top: "52%", left: "50%" },
-  C: { top: "80%", left: "50%" },
+  CF: { top: "17%", left: "50%" },
+  LF: { top: "26%", left: "25%" },
+  RF: { top: "26%", left: "75%" },
+  SS: { top: "44%", left: "37%" },
+  "2B": { top: "44%", left: "63%" },
+  "3B": { top: "60%", left: "27%" },
+  "1B": { top: "60%", left: "73%" },
+  P: { top: "62%", left: "50%" },
+  C: { top: "87%", left: "50%" },
 };
+
+function FieldArt() {
+  return (
+    <svg
+      viewBox="0 0 100 75"
+      preserveAspectRatio="none"
+      className="absolute inset-0 h-full w-full"
+      aria-hidden
+    >
+      {/* foul ground */}
+      <rect width="100" height="75" fill="#2f7a3d" />
+      {/* fair territory fan */}
+      <path
+        d="M 50 68 L 10.4 28.4 A 56 56 0 0 1 89.6 28.4 Z"
+        fill="#43974f"
+      />
+      {/* mowing rings */}
+      <g fill="none" stroke="#ffffff" strokeOpacity="0.05" strokeWidth="7">
+        <path d="M 21.7 39.7 A 40 40 0 0 1 78.3 39.7" />
+        <path d="M 31.6 49.6 A 26 26 0 0 1 68.4 49.6" />
+      </g>
+      {/* outfield fence with foul poles */}
+      <path
+        d="M 10.4 28.4 A 56 56 0 0 1 89.6 28.4"
+        fill="none"
+        stroke="#f5efe0"
+        strokeWidth="1.1"
+      />
+      <circle cx="10.4" cy="28.4" r="1" fill="#ffd23f" />
+      <circle cx="89.6" cy="28.4" r="1" fill="#ffd23f" />
+      {/* infield dirt */}
+      <path
+        d="M 50 69.5 L 72.5 47 L 50 24.5 L 27.5 47 Z"
+        fill="#c99054"
+        stroke="#b57e42"
+        strokeWidth="0.4"
+      />
+      {/* infield grass */}
+      <path d="M 50 61.5 L 64.5 47 L 50 32.5 L 35.5 47 Z" fill="#43974f" />
+      {/* base cutouts */}
+      <circle cx="71" cy="47" r="3" fill="#c99054" />
+      <circle cx="29" cy="47" r="3" fill="#c99054" />
+      <circle cx="50" cy="26" r="3" fill="#c99054" />
+      {/* mound + home circle */}
+      <circle cx="50" cy="47" r="3.6" fill="#c99054" />
+      <rect x="48.9" y="46.7" width="2.2" height="0.7" rx="0.2" fill="#ffffff" />
+      <circle cx="50" cy="68" r="5.2" fill="#c99054" />
+      {/* foul lines */}
+      <g stroke="#ffffff" strokeWidth="0.6">
+        <line x1="50" y1="68" x2="10.4" y2="28.4" />
+        <line x1="50" y1="68" x2="89.6" y2="28.4" />
+      </g>
+      {/* bases */}
+      <g fill="#ffffff" stroke="#1e1b1b" strokeWidth="0.25">
+        <rect x="69.6" y="45.6" width="2.8" height="2.8" transform="rotate(45 71 47)" />
+        <rect x="27.6" y="45.6" width="2.8" height="2.8" transform="rotate(45 29 47)" />
+        <rect x="48.6" y="24.6" width="2.8" height="2.8" transform="rotate(45 50 26)" />
+        {/* home plate */}
+        <path d="M 48.7 66.6 h 2.6 v 1.5 l -1.3 1.2 l -1.3 -1.2 Z" />
+      </g>
+    </svg>
+  );
+}
 
 interface Player {
   id: string;
@@ -242,9 +306,8 @@ export function Dashboard(props: Props) {
       <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
         {/* Field */}
         <div>
-          <div className="relative aspect-[4/3] overflow-hidden rounded-xl border-2 border-ink bg-green-700">
-            <div className="absolute left-1/2 top-[62%] h-[52%] w-[52%] -translate-x-1/2 -translate-y-1/2 rotate-45 rounded border-2 border-white/70 bg-amber-700/70" />
-            <div className="absolute left-1/2 top-[30%] h-[60%] w-[95%] -translate-x-1/2 rounded-t-full border-2 border-white/40" />
+          <div className="relative aspect-[4/3] overflow-hidden rounded-xl border-2 border-ink">
+            <FieldArt />
             {POSITIONS.map((pos) => {
               const pid = playerAt.get(pos) ?? null;
               const sel = pid !== null && pid === selected;
