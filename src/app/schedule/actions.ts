@@ -111,6 +111,20 @@ export async function setRsvp(formData: FormData): Promise<void> {
   revalidatePath("/");
 }
 
+/**
+ * Grid-cell variant of setRsvp: the availability grid shares one form and
+ * each button carries "eventId|playerId|status".
+ */
+export async function setRsvpCell(formData: FormData): Promise<void> {
+  const raw = String(formData.get("cell") ?? "");
+  const [eventId, playerId, status] = raw.split("|");
+  const fd = new FormData();
+  fd.set("eventId", eventId ?? "");
+  fd.set("playerId", playerId ?? "");
+  fd.set("status", status ?? "");
+  return setRsvp(fd);
+}
+
 const signupSchema = z.object({
   eventId: z.string().uuid(),
   kind: z.enum(["helper", "snacks", "drinks"]),

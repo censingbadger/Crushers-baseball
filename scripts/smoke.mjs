@@ -45,11 +45,22 @@ const rosterText = await page.textContent("main");
 if (!rosterText?.includes("Perry Vance")) fail("coach roster missing guardian contact");
 await page.screenshot({ path: `${SHOTS}/03-roster.png`, fullPage: true });
 
-// Availability grids render.
+// Availability grids render, with the weekend planner rollup.
 await page.goto(BASE + "/availability");
 const availText = await page.textContent("main");
 if (!availText?.includes("Tournament weekends")) fail("availability page incomplete");
+if (!availText?.includes("Best tournament weekends")) fail("weekend rollup missing");
+if (!availText?.includes("can play")) fail("weekend rollup missing viability chip");
 await page.screenshot({ path: `${SHOTS}/04-availability.png`, fullPage: true });
+
+// Coach adds a candidate day, then removes it.
+await page.fill("#day", "2026-09-12");
+await page.click("button:has-text('Add day')");
+await page.locator("th", { hasText: "9/12" }).waitFor({ timeout: 15000 });
+await page.locator("th:has-text('9/12') button[title*='Remove']").click();
+await page.waitForTimeout(1000);
+const afterRemove = await page.textContent("main");
+if (afterRemove?.includes("9/12")) fail("candidate day removal did not stick");
 
 // Import page reachable for coach.
 await page.goto(BASE + "/import");
@@ -267,6 +278,21 @@ if (!parentProgress?.includes("Monthly reports from the coaching staff")) {
 }
 if (!parentProgress?.includes("Dear Milo's family, (reviewed)")) {
   fail("parent progress missing the published (edited) report text");
+}
+
+// Parent taps Milo's first tournament-day cell; it cycles and persists.
+await page.goto(BASE + "/availability");
+const cell = page.locator("table").first().locator("button[data-cell]").first();
+const cellId = await cell.getAttribute("data-cell");
+const beforeTap = (await cell.textContent())?.trim();
+await cell.click();
+await page.waitForTimeout(1000);
+const afterTap = (
+  await page.locator(`button[data-cell='${cellId}']`).textContent()
+)?.trim();
+const CYCLE = { "·": "Y", Y: "?", "?": "N", N: "Y" };
+if (afterTap !== CYCLE[beforeTap ?? "·"]) {
+  fail(`availability tap did not cycle (${beforeTap} -> ${afterTap})`);
 }
 
 // Open the first upcoming event and flip Milo to Maybe.
