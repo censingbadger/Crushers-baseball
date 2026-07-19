@@ -206,6 +206,36 @@ async function main() {
     }
   }
 
+  // Player-page life for Milo: an avatar, a look, and a week of effort.
+  await db.insert(tables.playerPages).values({
+    playerId: playerIds[0],
+    avatarConfig: JSON.stringify({
+      skin: "s2",
+      hairStyle: "curly",
+      hairColor: "h1",
+      cap: "blue",
+      eyes: "game",
+      extra: "eyeblack",
+    }),
+    bgColor: "columbia",
+    borderColor: "orange",
+    font: "sporty",
+    wallpaper: "stitches",
+  });
+  for (const [offset, minutes] of [
+    [-1, 20],
+    [-3, 15],
+    [-8, 25],
+  ] as const) {
+    await db.insert(tables.workoutLogs).values({
+      playerId: playerIds[0],
+      day: isoDay(offset),
+      totalMinutes: minutes,
+      source: "manual",
+      note: "long toss + tee work",
+    });
+  }
+
   console.log("Seeded demo data.");
   console.log(`  Coach login:  ${DEMO_COACH.email} / ${DEMO_COACH.password}`);
   console.log(`  Parent login: ${DEMO_PARENT.email} / ${DEMO_PARENT.password}`);

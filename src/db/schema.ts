@@ -486,6 +486,72 @@ export const reports = pgTable(
   (t) => [uniqueIndex("report_once").on(t.seasonId, t.playerId, t.month)],
 );
 
+// Player pages (goal 12): each kid's own corner of the app, used through a
+// parent's login (no child accounts). Everything here is motivational —
+// avatars, personalization, effort logs. Coach ratings and evaluative
+// feedback never surface on these pages.
+export type AvatarKind = "builder" | "photo";
+export type PageFont = "sporty" | "classic" | "fun";
+
+export const playerPages = pgTable("player_pages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  playerId: uuid("player_id")
+    .notNull()
+    .unique()
+    .references(() => players.id),
+  avatarKind: text("avatar_kind").$type<AvatarKind>().notNull().default("builder"),
+  // JSON blob of builder choices (skin/hair/hat/etc.) — parsed client-side.
+  avatarConfig: text("avatar_config"),
+  // Small data-URI photo when avatarKind = "photo".
+  photoDataUrl: text("photo_data_url"),
+  bgColor: text("bg_color"),
+  borderColor: text("border_color"),
+  font: text("font").$type<PageFont>().notNull().default("sporty"),
+  wallpaper: text("wallpaper"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Coach-curated drill library feeding the guided workouts.
+export type DrillCategory =
+  | "hitting"
+  | "fielding"
+  | "throwing"
+  | "pitching"
+  | "speed"
+  | "fun";
+
+export const drills = pgTable("drills", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: text("title").notNull(),
+  category: text("category").$type<DrillCategory>().notNull(),
+  minutes: integer("minutes").notNull().default(10),
+  // The one thought to hold while doing it — shown big during workouts.
+  cue: text("cue").notNull(),
+  description: text("description"),
+  active: boolean("active").notNull().default(true),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Completed at-home sessions ("I have free time" workouts). Effort bars
+// and streaks derive from these — effort in, progress out.
+export type WorkoutSource = "guided" | "manual";
+
+export const workoutLogs = pgTable("workout_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  playerId: uuid("player_id")
+    .notNull()
+    .references(() => players.id),
+  day: date("day").notNull(),
+  totalMinutes: integer("total_minutes").notNull(),
+  // JSON array of {title, minutes, category} segments actually completed.
+  segments: text("segments"),
+  source: text("source").$type<WorkoutSource>().notNull().default("guided"),
+  note: text("note"),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Family availability for potential tournament weekends (goal 7). Distinct
 // from event RSVPs: these are "could we play that day" answers used to pick
 // which tournaments to enter. "unknown" is a candidate day the coach added
