@@ -1,11 +1,9 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { PGlite } from "@electric-sql/pglite";
 import { neon } from "@neondatabase/serverless";
 import { drizzle as drizzleNeonHttp } from "drizzle-orm/neon-http";
 import { migrate as migrateNeonHttp } from "drizzle-orm/neon-http/migrator";
-import { drizzle as drizzlePglite, type PgliteDatabase } from "drizzle-orm/pglite";
-import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
+import { type PgliteDatabase } from "drizzle-orm/pglite";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
 import { migrate as migratePostgres } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
@@ -78,10 +76,18 @@ async function createDb(): Promise<Db> {
       : (process.env.PGLITE_DATA_DIR ??
         path.join(process.cwd(), ".data", "pglite"));
   if (dataDir) mkdirSync(dataDir, { recursive: true });
+  // PGlite (and its WASM machinery) loads lazily so deployments that use a
+  // hosted database never pay for — or crash on — the embedded engine.
+  const [{ PGlite }, { drizzle: drizzlePglite }, { migrate: migratePglite }] =
+    await Promise.all([
+      import("@electric-sql/pglite"),
+      import("drizzle-orm/pglite"),
+      import("drizzle-orm/pglite/migrator"),
+    ]);
   const client = dataDir ? new PGlite(dataDir) : new PGlite();
   const db = drizzlePglite(client, { schema });
   await migratePglite(db, { migrationsFolder });
-  return db;
+  return db as unknown as Db;
 }
 
 export function getDb(): Promise<Db> {
