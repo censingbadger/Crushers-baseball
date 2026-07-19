@@ -78,6 +78,26 @@ if (!lineupText?.includes("Strongest lineup")) fail("lineup page did not solve")
 if (lineupText?.includes("unfilled")) fail("lineup left positions unfilled with a full pool");
 await page.screenshot({ path: `${SHOTS}/07-lineup.png`, fullPage: true });
 
+// Weekend planner: start a plan for the seeded tournament, save a line,
+// verify the balance panel tracks it.
+await page.goto(BASE + "/weekend");
+// Index 0 is the "— choose —" placeholder; the seeded tournament is next.
+await page.selectOption("#eventId", { index: 1 });
+await page.click("form button[type=submit]:has-text('Start plan')");
+await page.waitForURL("**/weekend?event=**");
+const firstRow = page.locator("tbody tr").first();
+const firstPlayerId = await firstRow.locator("input[name='playerId']").inputValue();
+await page.selectOption(`select[name='posA_${firstPlayerId}']`, "C");
+await page.fill(`input[name='inningsA_${firstPlayerId}']`, "20");
+await page.fill(`input[name='pitch_${firstPlayerId}']`, "4");
+await page.click("button:has-text('Save all')");
+// The URL already matches before the POST resolves, so wait for the balance
+// panel to reflect the saved line instead of waiting on navigation.
+await page.locator("text=20/24").first().waitFor({ timeout: 15000 });
+const weekendText = await page.textContent("main");
+if (!weekendText?.includes("Position coverage")) fail("weekend balance panel missing");
+await page.screenshot({ path: `${SHOTS}/08-weekend.png`, fullPage: true });
+
 // Player edit page loads for the coach.
 await page.goto(BASE + "/roster");
 await page.click("tbody a[href^='/roster/']");
