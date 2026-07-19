@@ -99,17 +99,33 @@ Players do not get their own logins (see "Out of scope").
 - Lineups are set before every game (batting order + fielding by inning) and
   edited live during it; the in-game view is the same tool, phone-first.
 
-### 4. Game-day execution & pitch safety
+### 4. The dugout dashboard — game day on one page
 
-- The pre-game lineup (seeded by the solver, adjusted by the coach) becomes
-  the live game-day view: current inning, who's where, who's on the bench.
-- Sanity checks: no one in two spots, no position left empty.
-- Pitch count log: a couple of taps per half-inning from the dugout.
-- Pitch Smart compliance (ages 11–12): daily cap of 85 pitches and required
-  rest days (21–35 pitches → 1 day, 36–50 → 2, 51–65 → 3, 66+ → 4). The app
-  shows who is eligible to pitch today and how many pitches they have left,
-  and warns loudly — including inside the move assistant — before a rule
-  would be broken. Limits live in configuration, not code.
+A single-page, iPad-first dashboard that runs the whole game from the
+dugout:
+
+- **Opens from the schedule**: tap today's game and it pre-loads the
+  planned lineup and that day's available players; tap **Start** and the
+  game clock begins.
+- **Field view**: a baseball diamond with each position labeled by the
+  player in it for the current inning, the bench alongside, and the batting
+  order down the side. Changes are **drag-and-drop** — field to bench,
+  bench to field, position to position — with the goal 3 move assistant
+  suggesting the cascade (who backfills whom) and sanity checks blocking
+  impossible states.
+- **Live counters on every player**: innings on the bench, innings pitched,
+  and current pitch count.
+- **Real-time pitch counts and score**: whatever the scorekeeper enters in
+  the app streams to the dashboard live. A **box score strip at the
+  bottom** shows runs by inning, the current inning, and outs.
+- **Game clock**: games are 90 minutes from a scheduled start; time
+  remaining is always visible, tied to the schedule and the Start button.
+- **Pitch Smart compliance (ages 11–12)** wired into every surface: daily
+  cap of 85 pitches and required rest days (21–35 pitches → 1 day, 36–50 →
+  2, 51–65 → 3, 66+ → 4). The dashboard shows who is eligible to pitch
+  today and how many pitches they have left, and warns loudly — including
+  during a drag — before a rule would be broken. Limits live in
+  configuration, not code.
 
 ### 5. Stats — GameChanger stays the scorer, we stay smart
 
@@ -123,10 +139,14 @@ on their systems), so we do not ask families to score games in a second app.
   (CSV) into the app periodically; the app maps rows to our roster and
   populates per-game and season stats automatically. Same pattern for
   Perfect Game/DiamondKast exports where available.
-- **Manual scoring as the fallback**: parents can enter a game's stats by
-  hand in the app — GameChanger-style — for scrimmages, practices, events
-  with no GC scoring, or if we ever choose to leave GC. This is the fallback
-  and the escape hatch, not the primary path.
+- **In-app scoring is the live companion and the fallback**: a parent can
+  score a game in the app — GameChanger-style — and everything they enter
+  (runs, outs, pitch counts) streams straight to the dugout dashboard
+  (goal 4). When GameChanger is also being scored as the league-facing
+  record, the in-app role shrinks to a **lightweight dugout feed** — score,
+  outs, and pitch counts, a few taps per half-inning — so nobody
+  double-scores play-by-play. Full in-app scoring covers scrimmages, events
+  without GC, and the escape hatch if we ever leave GC.
 - Derived numbers computed automatically: AVG, OBP, SLG, OPS; ERA and WHIP
   on a 6-inning basis. Season totals, leaderboards, and a per-player page
   parents can see.
@@ -225,6 +245,9 @@ Summer 2026"). Every one of its features has a home in the app:
   default. No ops burden on a volunteer coach.
 - **Private by default.** Kids' data sits behind a login. Parents see only
   their own player's ratings and reports. Nothing is public.
+- **Field-proof.** Ballpark connectivity is bad. The dugout dashboard keeps
+  working through dropouts — state lives on the device and syncs when the
+  connection returns.
 
 ## What success looks like
 
@@ -232,8 +255,12 @@ Summer 2026"). Every one of its features has a home in the app:
 - A coach rates a player on a phone in under 60 seconds at practice.
 - Uploading the initial Excel ratings matrix produces a suggested strongest
   lineup in seconds.
-- A mid-game "move 1B to C" shows the ranked cascade of dependent moves
-  instantly, with pitch-eligibility warnings inline.
+- Opening a scheduled game on the dugout iPad pre-loads the lineup;
+  positions confirmed and clock started in under a minute.
+- A mid-game "move 1B to C" is one drag: the ranked cascade of dependent
+  moves appears instantly, with pitch-eligibility warnings inline.
+- The scorekeeper's pitch counts and the box score appear on the dugout
+  dashboard within seconds of being entered.
 - A GameChanger stats export imports in under 2 minutes with every row
   matched to a player.
 - Monthly reports for the whole team are generated, coach-reviewed, and
@@ -267,6 +294,6 @@ Summer 2026"). Every one of its features has a home in the app:
   icon.
 - **Build order**: (1) foundation — seasons, roster, schedule, auth &
   roles, branding theme, Google Sheet import; (2) ratings + position matrix
-  + weekend allocation + lineup solver (the centerpiece); (3) game-day
-  execution + pitch safety; (4) stats import + manual entry; (5) AI
-  reports; (6) availability planning & signups.
+  + weekend allocation + lineup solver (the centerpiece); (3) the dugout
+  dashboard + pitch safety + live scoring feed; (4) stats import + manual
+  entry; (5) AI reports; (6) availability planning & signups.
