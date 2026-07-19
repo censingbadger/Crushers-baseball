@@ -205,6 +205,34 @@ if (!coachProgress?.includes("Hitting")) fail("progress missing rated dimension"
 if (!coachProgress?.includes("4 · 5")) fail("progress missing rating trend points");
 await page.screenshot({ path: `${SHOTS}/09-progress.png`, fullPage: true });
 
+// Monthly reports: draft for Milo (template fallback), review, publish.
+await page.goto(BASE + "/reports");
+const reportsText = await page.textContent("main");
+if (!reportsText?.includes("Monthly parent reports")) fail("reports page incomplete");
+await page
+  .locator("section div", { hasText: "Milo Vance" })
+  .locator("button:has-text('Generate draft')")
+  .first()
+  .click();
+await page.waitForURL("**/reports/**");
+const draftText = await page.inputValue("textarea[name='finalText']");
+if (!draftText.includes("Dear Milo's family,")) fail("report draft missing greeting");
+if (!draftText.includes("Major areas that we intend to focus on")) {
+  fail("report draft missing letter structure");
+}
+if (!draftText.includes("Quick glove to the dirt")) {
+  fail("report draft missing shared cue");
+}
+if (draftText.includes("Secret cue text")) fail("report draft leaked a coach-only note");
+// Edit before publishing: coach's voice wins.
+await page.fill(
+  "textarea[name='finalText']",
+  draftText.replace("Dear Milo's family,", "Dear Milo's family, (reviewed)"),
+);
+await page.click("button:has-text('Approve & publish')");
+await page.waitForURL("**published=1**");
+await page.screenshot({ path: `${SHOTS}/13-report.png`, fullPage: true });
+
 // Log out, log in as parent, RSVP for own player on the next practice.
 await page.click("header form button");
 await page.waitForURL("**/login");
@@ -233,6 +261,12 @@ if (!parentProgress?.includes("Quick glove to the dirt")) {
 }
 if (parentProgress?.includes("Secret cue text")) {
   fail("parent progress leaked a coach-only note");
+}
+if (!parentProgress?.includes("Monthly reports from the coaching staff")) {
+  fail("parent progress missing published report section");
+}
+if (!parentProgress?.includes("Dear Milo's family, (reviewed)")) {
+  fail("parent progress missing the published (edited) report text");
 }
 
 // Open the first upcoming event and flip Milo to Maybe.

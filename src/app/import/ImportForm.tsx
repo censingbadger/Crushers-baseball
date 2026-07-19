@@ -40,7 +40,7 @@ export function ImportForm({
             </p>
           ))}
           {result.warnings.length > 0 && (
-            <details open={!result.ok} className="rounded border-2 border-ink bg-amber-50 p-2">
+            <details open={!result.ok} className="rounded border border-line bg-amber-50 p-2">
               <summary className="cursor-pointer text-xs font-bold uppercase">
                 {result.warnings.length} warning{result.warnings.length === 1 ? "" : "s"}
               </summary>
@@ -52,7 +52,7 @@ export function ImportForm({
             </details>
           )}
           {result.credentials && result.credentials.length > 0 && (
-            <div className="rounded border-2 border-ink bg-team-blue-light p-2">
+            <div className="rounded border border-line bg-team-blue-light p-2">
               <p className="text-xs font-bold uppercase">
                 New parent accounts — share each temp password once, then have
                 them change it

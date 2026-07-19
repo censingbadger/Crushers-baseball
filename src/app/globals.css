@@ -2,34 +2,55 @@
 
 /*
  * Crushers Blue theme (goal 11).
- * Columbia blue primary, orange + white accents, black borders.
- * Orange (#F47F0C) and near-black (#1E1B1B) are sampled from the team's
- * "OC" logo (public/logo.png).
+ * Columbia blue primary, orange + white accents, ink for type.
+ * Orange (#F47F0C) and near-black ink are sampled from the team's "OC"
+ * logo (public/logo.png). Surfaces are white on a blue-tinted ground with
+ * hairline borders and soft shadows; Barlow Condensed gives headings the
+ * jersey look, Manrope carries body text.
  */
 @theme {
   --color-team-blue: #9bcbeb;
-  --color-team-blue-light: #d9ebf7;
-  --color-team-blue-dark: #5b91b8;
+  --color-team-blue-light: #ddedf9;
+  --color-team-blue-dark: #2f6f9f;
   --color-team-orange: #f47f0c;
-  --color-team-orange-dark: #c05e06;
-  --color-ink: #1e1b1b;
+  --color-team-orange-dark: #c2620a;
+  --color-ink: #171a20;
   --color-paper: #ffffff;
-  --color-paper-tint: #f4f9fd;
+  --color-paper-tint: #f2f7fb;
+  --color-line: #dbe6ef;
+  --color-line-strong: #b7cbda;
+  --color-muted: #5b6b7a;
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+    var(--font-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --shadow-card: 0 1px 2px rgb(23 42 58 / 0.05), 0 6px 18px rgb(23 42 58 / 0.06);
+  --shadow-pop: 0 2px 6px rgb(23 42 58 / 0.1), 0 12px 28px rgb(23 42 58 / 0.12);
 }
 
 body {
-  background: var(--color-paper-tint);
+  background:
+    radial-gradient(1100px 380px at 50% -180px, rgb(155 203 235 / 0.32), transparent 70%),
+    var(--color-paper-tint);
   color: var(--color-ink);
 }
 
-/* Black-bordered "card" is the app's signature surface. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), var(--font-sans);
+  letter-spacing: 0.005em;
+  text-wrap: balance;
+}
+h1 {
+  text-transform: uppercase;
+}
+
+/* The app's signature surface: clean white card, hairline edge, soft lift. */
 .card {
   background: var(--color-paper);
-  border: 2px solid var(--color-ink);
-  border-radius: 0.75rem;
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-card);
 }
 
 .btn {
@@ -37,48 +58,78 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.375rem;
-  border: 2px solid var(--color-ink);
-  border-radius: 0.5rem;
-  padding: 0.375rem 0.875rem;
-  font-weight: 600;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 0.625rem;
+  padding: 0.4rem 0.9rem;
+  font-weight: 700;
   background: var(--color-paper);
-  transition: background-color 120ms ease;
+  box-shadow: 0 1px 2px rgb(23 42 58 / 0.06);
+  transition:
+    background-color 130ms ease,
+    border-color 130ms ease,
+    box-shadow 130ms ease,
+    transform 80ms ease;
 }
 .btn:hover {
   background: var(--color-team-blue-light);
+  border-color: var(--color-team-blue);
+}
+.btn:active {
+  transform: translateY(1px);
 }
 .btn-primary {
-  background: var(--color-team-orange);
+  background: linear-gradient(180deg, #ff9426, var(--color-team-orange) 55%, #e07008);
+  border-color: var(--color-team-orange-dark);
   color: var(--color-paper);
+  text-shadow: 0 1px 1px rgb(0 0 0 / 0.15);
+  box-shadow: 0 1px 2px rgb(194 98 10 / 0.35), 0 6px 14px rgb(244 127 12 / 0.25);
 }
 .btn-primary:hover {
-  background: var(--color-team-orange-dark);
+  background: linear-gradient(180deg, #f88a15, var(--color-team-orange-dark));
+  border-color: var(--color-team-orange-dark);
 }
 .btn-blue {
   background: var(--color-team-blue);
+  border-color: var(--color-team-blue-dark);
 }
 .btn-blue:hover {
   background: var(--color-team-blue-dark);
+  border-color: var(--color-team-blue-dark);
   color: var(--color-paper);
 }
 
 .field {
   width: 100%;
-  border: 2px solid var(--color-ink);
-  border-radius: 0.5rem;
-  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 0.625rem;
+  padding: 0.45rem 0.7rem;
   background: var(--color-paper);
+  transition: border-color 130ms ease, box-shadow 130ms ease;
 }
 .field:focus {
-  outline: 3px solid var(--color-team-blue);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--color-team-blue-dark);
+  box-shadow: 0 0 0 3px rgb(155 203 235 / 0.55);
 }
 
 .label {
   display: block;
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-bottom: 0.25rem;
+  letter-spacing: 0.07em;
+  color: var(--color-muted);
+  margin-bottom: 0.3rem;
+}
+
+/* Small rounded status markers (roster status, game source, live state). */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }

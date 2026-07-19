@@ -59,7 +59,7 @@ export default async function MatrixPage({
 
       <div className="flex flex-wrap gap-1 text-sm font-semibold">
         <Link
-          className={`rounded border-2 border-ink px-3 py-1 ${activeTab === "blended" ? "bg-ink text-paper" : "bg-paper hover:bg-team-blue-light"}`}
+          className={`rounded border border-line px-3 py-1 ${activeTab === "blended" ? "bg-ink text-paper" : "bg-paper hover:bg-team-blue-light"}`}
           href="/matrix"
         >
           Blended
@@ -67,14 +67,14 @@ export default async function MatrixPage({
         {raters.map((r) => (
           <Link
             key={r}
-            className={`rounded border-2 border-ink px-3 py-1 ${activeTab === r ? "bg-team-orange text-paper" : "bg-paper hover:bg-team-blue-light"}`}
+            className={`rounded border border-line px-3 py-1 ${activeTab === r ? "bg-team-orange text-paper" : "bg-paper hover:bg-team-blue-light"}`}
             href={`/matrix?rater=${encodeURIComponent(r)}`}
           >
             Coach {r}
           </Link>
         ))}
         <Link
-          className={`rounded border-2 border-ink px-3 py-1 ${activeTab === "new" ? "bg-team-orange text-paper" : "bg-paper hover:bg-team-blue-light"}`}
+          className={`rounded border border-line px-3 py-1 ${activeTab === "new" ? "bg-team-orange text-paper" : "bg-paper hover:bg-team-blue-light"}`}
           href="/matrix?rater=new"
         >
           + New coach
@@ -87,7 +87,7 @@ export default async function MatrixPage({
             <tr>
               <th className="py-1 pr-2 text-left">Player</th>
               {POSITIONS.map((pos) => (
-                <th key={pos} className="border border-ink/20 px-2 py-1 text-center">
+                <th key={pos} className="border border-line px-2 py-1 text-center">
                   {pos}
                 </th>
               ))}
@@ -104,12 +104,12 @@ export default async function MatrixPage({
               const row = (
                 <tr
                   key={p.playerId}
-                  className={firstPractice ? "border-t-4 border-ink/40" : ""}
+                  className={firstPractice ? "border-t-4 border-line-strong" : ""}
                 >
                   <td className="whitespace-nowrap py-1.5 pr-2 font-semibold">
                     {p.firstName} {p.lastName}
                     {p.status !== "full" && (
-                      <span className="ml-1 rounded border border-ink bg-team-blue-light px-1 py-0.5 text-[10px] font-bold uppercase">
+                      <span className="ml-1 rounded border border-line bg-team-blue-light px-1 py-0.5 text-[10px] font-bold uppercase">
                         {p.status}
                       </span>
                     )}
@@ -117,7 +117,7 @@ export default async function MatrixPage({
                   {POSITIONS.map((pos) => {
                     const v = values?.get(pos);
                     return (
-                      <td key={pos} className="border border-ink/20 p-0 text-center">
+                      <td key={pos} className="border border-line p-0 text-center">
                         {editable ? (
                           <input
                             name={`pos_${pos}`}

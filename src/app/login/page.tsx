@@ -19,7 +19,7 @@ export default async function LoginPage({
           Sign in to the Crushers Blue team manager.
         </p>
         {error && (
-          <p className="mb-3 rounded border-2 border-ink bg-team-orange px-3 py-2 text-sm font-semibold text-paper">
+          <p className="mb-3 rounded border border-line bg-team-orange px-3 py-2 text-sm font-semibold text-paper">
             {error === "missing"
               ? "Enter your email and password."
               : "That email or password didn't match."}

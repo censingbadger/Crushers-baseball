@@ -17,7 +17,7 @@ const CELL: Record<string, { label: string; cls: string }> = {
 function Cell({ status }: { status: string | undefined }) {
   const c = status ? CELL[status] : undefined;
   return (
-    <td className="border border-ink/20 p-0 text-center">
+    <td className="border border-line p-0 text-center">
       {c ? (
         <span className={`block px-1.5 py-1 text-xs font-bold ${c.cls}`}>{c.label}</span>
       ) : (
@@ -65,7 +65,7 @@ export default async function AvailabilityPage() {
               <tr>
                 <th className="sticky left-0 bg-paper py-1 pr-2 text-left">Player</th>
                 {events.map((e) => (
-                  <th key={e.id} className="border border-ink/20 px-1 py-1 text-center text-[10px] font-bold">
+                  <th key={e.id} className="border border-line px-1 py-1 text-center text-[10px] font-bold">
                     <div>{formatEventDate(e.startsAt)}</div>
                     <div className="font-normal uppercase text-neutral-500">{e.type.slice(0, 4)}</div>
                   </th>
@@ -83,14 +83,14 @@ export default async function AvailabilityPage() {
                   ))}
                 </tr>
               ))}
-              <tr className="border-t-2 border-ink font-bold">
+              <tr className="border-t border-line font-bold">
                 <td className="sticky left-0 bg-paper py-1 pr-2">Players in</td>
                 {events.map((e) => {
                   let yes = 0;
                   const m = rsvps.get(e.id);
                   if (m) for (const s of m.values()) if (s === "yes") yes++;
                   return (
-                    <td key={e.id} className="border border-ink/20 py-1 text-center text-team-blue-dark">
+                    <td key={e.id} className="border border-line py-1 text-center text-team-blue-dark">
                       {yes}
                     </td>
                   );
@@ -116,7 +116,7 @@ export default async function AvailabilityPage() {
               <tr>
                 <th className="sticky left-0 bg-paper py-1 pr-2 text-left">Player</th>
                 {dayList.map((day) => (
-                  <th key={day} className="border border-ink/20 px-1 py-1 text-center text-[10px] font-bold">
+                  <th key={day} className="border border-line px-1 py-1 text-center text-[10px] font-bold">
                     {formatIsoDay(day)}
                   </th>
                 ))}
@@ -133,12 +133,12 @@ export default async function AvailabilityPage() {
                   ))}
                 </tr>
               ))}
-              <tr className="border-t-2 border-ink font-bold">
+              <tr className="border-t border-line font-bold">
                 <td className="sticky left-0 bg-paper py-1 pr-2">Available</td>
                 {dayTotals.map((n, i) => (
                   <td
                     key={dayList[i]}
-                    className={`border border-ink/20 py-1 text-center ${
+                    className={`border border-line py-1 text-center ${
                       n >= 9 ? "bg-green-600 text-white" : n <= 7 ? "bg-red-600 text-white" : "bg-amber-400"
                     }`}
                   >

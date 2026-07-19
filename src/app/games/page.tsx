@@ -65,11 +65,11 @@ export default async function GamesPage() {
         {games.length === 0 ? (
           <p className="text-sm text-neutral-600">None yet.</p>
         ) : (
-          <ul className="divide-y-2 divide-ink/10">
+          <ul className="divide-y divide-line">
             {games.map((g) => (
               <li key={g.id} className="flex flex-wrap items-center gap-2 py-2">
                 <span
-                  className={`rounded border-2 border-ink px-1.5 py-0.5 text-xs font-bold uppercase ${
+                  className={`chip ${
                     g.status === "live"
                       ? "bg-green-600 text-white"
                       : g.status === "final"

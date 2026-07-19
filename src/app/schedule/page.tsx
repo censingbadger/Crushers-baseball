@@ -21,12 +21,12 @@ export default async function SchedulePage() {
   const past = events.filter((e) => e.startsAt < now).reverse();
 
   const renderList = (list: typeof events) => (
-    <ul className="divide-y-2 divide-ink/10">
+    <ul className="divide-y divide-line">
       {list.map((e) => {
         const counts = headcount(rsvps.get(e.id));
         return (
           <li key={e.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2">
-            <span className="w-24 shrink-0 rounded border border-ink bg-team-blue-light px-1.5 py-0.5 text-center text-xs font-bold">
+            <span className="w-24 shrink-0 rounded border border-line bg-team-blue-light px-1.5 py-0.5 text-center text-xs font-bold">
               {EVENT_TYPE_LABEL[e.type]}
             </span>
             <Link

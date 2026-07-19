@@ -1,8 +1,9 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getDb, tables } from "@/db";
 import { editablePlayerIds, requireUser } from "@/lib/auth";
 import { getActiveSeason, getRoster } from "@/lib/data";
 import { DIMENSIONS, dimensionTrend } from "@/lib/development";
+import { monthLabel } from "@/lib/reports";
 
 const TREND_ARROW = { up: "↗", down: "↘", flat: "→" } as const;
 
@@ -27,7 +28,7 @@ export default async function ProgressPage() {
   const ids = players.map((p) => p.playerId);
 
   const db = await getDb();
-  const [ratingRows, aspirationRows, noteRows] = await Promise.all([
+  const [ratingRows, aspirationRows, noteRows, reportRows] = await Promise.all([
     db
       .select()
       .from(tables.playerRatings)
@@ -56,6 +57,18 @@ export default async function ProgressPage() {
         ),
       )
       .orderBy(asc(tables.devNotes.createdAt)),
+    // Only published reports ever leave the coaches' desk.
+    db
+      .select()
+      .from(tables.reports)
+      .where(
+        and(
+          eq(tables.reports.seasonId, season.id),
+          inArray(tables.reports.playerId, ids),
+          eq(tables.reports.status, "published"),
+        ),
+      )
+      .orderBy(desc(tables.reports.month)),
   ]);
 
   return (
@@ -71,6 +84,7 @@ export default async function ProgressPage() {
       {players.map((p) => {
         const aspiration = aspirationRows.find((a) => a.playerId === p.playerId);
         const cues = noteRows.filter((n) => n.playerId === p.playerId);
+        const reports = reportRows.filter((r) => r.playerId === p.playerId);
         const trends = DIMENSIONS.map((dim) => ({
           dim,
           trend: dimensionTrend(
@@ -90,7 +104,7 @@ export default async function ProgressPage() {
             </h2>
 
             {(aspiration?.seasonGoals || aspiration?.desiredPositions) && (
-              <div className="rounded border-2 border-ink bg-team-blue-light p-2 text-sm">
+              <div className="rounded border border-line bg-team-blue-light p-2 text-sm">
                 <span className="font-bold">This season:</span>{" "}
                 {aspiration.seasonGoals}
                 {aspiration.desiredPositions && (
@@ -109,8 +123,8 @@ export default async function ProgressPage() {
                 </h3>
                 <ul className="space-y-1 text-sm">
                   {cues.map((n) => (
-                    <li key={n.id} className="rounded border-2 border-ink bg-paper p-2">
-                      <span className="rounded border border-ink bg-team-blue-light px-1 text-[10px] font-bold uppercase">
+                    <li key={n.id} className="rounded border border-line bg-paper p-2">
+                      <span className="rounded border border-line bg-team-blue-light px-1 text-[10px] font-bold uppercase">
                         {n.category}
                       </span>{" "}
                       <span className="font-semibold">{n.cue}</span>
@@ -124,7 +138,7 @@ export default async function ProgressPage() {
               <table className="w-full text-sm">
                 <tbody>
                   {trends.map(({ dim, trend }) => (
-                    <tr key={dim.key} className="border-b border-ink/10">
+                    <tr key={dim.key} className="border-b border-line">
                       <td className="py-1 pr-2">{dim.label}</td>
                       <td className="py-1 pr-2 text-right font-bold">
                         {trend.latest}
@@ -151,6 +165,26 @@ export default async function ProgressPage() {
               </table>
             ) : (
               <p className="text-sm text-neutral-600">No ratings yet this season.</p>
+            )}
+
+            {reports.length > 0 && (
+              <div>
+                <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-team-orange-dark">
+                  Monthly reports from the coaching staff
+                </h3>
+                <div className="space-y-2">
+                  {reports.map((r) => (
+                    <details key={r.id} className="rounded border border-line bg-paper">
+                      <summary className="cursor-pointer px-3 py-2 text-sm font-bold">
+                        {monthLabel(r.month)}
+                      </summary>
+                      <div className="whitespace-pre-wrap border-t border-line/10 px-3 py-2 text-sm leading-relaxed">
+                        {r.finalText ?? r.draftText}
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              </div>
             )}
           </section>
         );

@@ -279,7 +279,7 @@ export function Dashboard(props: Props) {
             </button>
           )}
           {game.status === "final" && (
-            <span className="rounded border-2 border-ink bg-ink px-2 py-0.5 text-xs font-bold uppercase text-paper">
+            <span className="rounded border border-line bg-ink px-2 py-0.5 text-xs font-bold uppercase text-paper">
               Final
             </span>
           )}
@@ -306,7 +306,7 @@ export function Dashboard(props: Props) {
       <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
         {/* Field */}
         <div>
-          <div className="relative aspect-[4/3] overflow-hidden rounded-xl border-2 border-ink">
+          <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-line">
             <FieldArt />
             {POSITIONS.map((pos) => {
               const pid = playerAt.get(pos) ?? null;
@@ -341,7 +341,7 @@ export function Dashboard(props: Props) {
 
           {/* Pitch counter for the current pitcher */}
           {pitcherId && (
-            <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border-2 border-ink bg-paper p-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-paper p-2">
               <span className="text-sm font-bold">
                 ⚾ {nameOf(pitcherId)} — {props.gamePitchesByPlayer[pitcherId] ?? 0} pitches
                 <span className="ml-1 text-xs font-semibold text-neutral-600">
@@ -363,7 +363,7 @@ export function Dashboard(props: Props) {
                 </button>
               ))}
               {(eligibility[pitcherId]?.remaining ?? 1) <= 10 && (
-                <span className="rounded border-2 border-ink bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+                <span className="rounded border border-line bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
                   {eligibility[pitcherId]?.remaining === 0 ? "AT THE CAP" : "NEAR THE CAP"}
                 </span>
               )}
@@ -371,7 +371,7 @@ export function Dashboard(props: Props) {
           )}
 
           {/* Bench */}
-          <div className="mt-2 rounded-lg border-2 border-ink bg-paper p-2">
+          <div className="mt-2 rounded-lg border border-line bg-paper p-2">
             <span className="text-xs font-bold uppercase">Bench</span>
             <div className="mt-1 flex flex-wrap gap-1">
               {benchIds.length === 0 && (
@@ -429,7 +429,7 @@ export function Dashboard(props: Props) {
 
         {/* Batting order + counters */}
         <div className="space-y-3">
-          <div className="rounded-lg border-2 border-ink bg-paper p-2">
+          <div className="rounded-lg border border-line bg-paper p-2">
             <span className="text-xs font-bold uppercase">Batting order</span>
             <ol className="mt-1 space-y-0.5 text-sm">
               {props.battingOrder.map((o, i) => (
@@ -440,14 +440,14 @@ export function Dashboard(props: Props) {
                     {current[o.playerId] === BENCH ? "bench" : current[o.playerId]}
                   </span>
                   <button
-                    className="rounded border border-ink px-1 text-xs"
+                    className="rounded border border-line px-1 text-xs"
                     onClick={() => startTransition(async () => { await swapBattingSpot(game.id, o.playerId, "up"); router.refresh(); })}
                     disabled={i === 0}
                   >
                     ↑
                   </button>
                   <button
-                    className="rounded border border-ink px-1 text-xs"
+                    className="rounded border border-line px-1 text-xs"
                     onClick={() => startTransition(async () => { await swapBattingSpot(game.id, o.playerId, "down"); router.refresh(); })}
                     disabled={i === props.battingOrder.length - 1}
                   >
@@ -457,7 +457,7 @@ export function Dashboard(props: Props) {
               ))}
             </ol>
           </div>
-          <div className="rounded-lg border-2 border-ink bg-paper p-2 text-sm">
+          <div className="rounded-lg border border-line bg-paper p-2 text-sm">
             <span className="text-xs font-bold uppercase">Innings pitched</span>
             {Object.entries(props.pitchInningsByPlayer)
               .filter(([, n]) => n > 0)
@@ -474,7 +474,7 @@ export function Dashboard(props: Props) {
       <div className="card overflow-x-auto p-3">
         <table className="w-full min-w-[420px] text-center text-sm">
           <thead>
-            <tr className="border-b-2 border-ink">
+            <tr className="border-b border-line-strong">
               <th className="py-1 text-left">Box</th>
               {innings.map((i) => (
                 <th key={i} className={`px-2 py-1 ${i === game.currentInning ? "bg-team-blue-light" : ""}`}>{i}</th>
@@ -484,7 +484,7 @@ export function Dashboard(props: Props) {
           </thead>
           <tbody>
             {(["us", "them"] as const).map((side) => (
-              <tr key={side} className="border-b border-ink/10">
+              <tr key={side} className="border-b border-line">
                 <td className="py-1 text-left font-bold">
                   {side === "us" ? "Crushers" : (game.opponent ?? "Them")}
                 </td>

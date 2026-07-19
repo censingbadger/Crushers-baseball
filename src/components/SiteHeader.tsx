@@ -2,83 +2,60 @@ import Image from "next/image";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { logout } from "@/app/auth-actions";
+import { NavLinks, type NavItem } from "@/components/NavLinks";
 
-function LogoMark() {
-  return (
-    <Image
-      src="/logo.png"
-      alt="Crushers logo"
-      width={40}
-      height={36}
-      priority
-      className="h-9 w-auto"
-    />
-  );
-}
+const EVERYONE: NavItem[] = [
+  { href: "/schedule", label: "Schedule" },
+  { href: "/roster", label: "Roster" },
+  { href: "/availability", label: "Availability" },
+  { href: "/progress", label: "Progress" },
+  { href: "/stats", label: "Stats" },
+];
+
+const COACH: NavItem[] = [
+  { href: "/games", label: "Game day", accent: true },
+  { href: "/rate", label: "Rate" },
+  { href: "/reports", label: "Reports" },
+  { href: "/matrix", label: "Matrix" },
+  { href: "/lineup", label: "Lineup" },
+  { href: "/weekend", label: "Weekend" },
+  { href: "/import", label: "Import" },
+];
 
 export async function SiteHeader() {
   const user = await getCurrentUser();
+  const items = user?.role === "coach" ? [...EVERYONE, ...COACH] : EVERYONE;
   return (
-    <header className="border-b-2 border-ink bg-team-blue">
-      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 font-extrabold">
-          <LogoMark />
-          <span className="text-lg tracking-tight">
+    <header className="sticky top-0 z-40 border-b border-team-blue-dark/25 bg-gradient-to-b from-[#a8d4f0] to-team-blue shadow-[0_2px_14px_rgb(23_42_58_/_0.12)] backdrop-blur">
+      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2.5">
+        <Link href="/" className="flex items-center gap-2.5">
+          <Image
+            src="/logo.png"
+            alt="Crushers logo"
+            width={40}
+            height={36}
+            priority
+            className="h-9 w-auto drop-shadow-sm"
+          />
+          <span
+            className="text-xl font-extrabold uppercase leading-none tracking-wide"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
             Crushers <span className="text-team-orange-dark">Blue</span>
           </span>
         </Link>
         {user && (
           <>
-            <nav className="flex flex-wrap items-center gap-1 text-sm font-semibold">
-              <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/schedule">
-                Schedule
-              </Link>
-              <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/roster">
-                Roster
-              </Link>
-              <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/availability">
-                Availability
-              </Link>
-              <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/progress">
-                Progress
-              </Link>
-              <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/stats">
-                Stats
-              </Link>
-              {user.role === "coach" && (
-                <>
-                  <Link className="rounded px-2 py-1 font-extrabold text-team-orange-dark hover:bg-team-blue-light" href="/games">
-                    Game day
-                  </Link>
-                  <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/rate">
-                    Rate
-                  </Link>
-                  <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/matrix">
-                    Matrix
-                  </Link>
-                  <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/lineup">
-                    Lineup
-                  </Link>
-                  <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/weekend">
-                    Weekend
-                  </Link>
-                  <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/import">
-                    Import
-                  </Link>
-                </>
-              )}
-            </nav>
+            <NavLinks items={items} />
             <div className="ml-auto flex items-center gap-2 text-sm">
-              <span className="hidden sm:inline">
+              <span className="hidden font-semibold sm:inline">
                 {user.displayName}
                 {user.role === "coach" && (
-                  <span className="ml-1 rounded border border-ink bg-team-orange px-1 py-0.5 text-[10px] font-bold uppercase text-paper">
-                    Coach
-                  </span>
+                  <span className="chip ml-1.5 bg-ink text-paper">Coach</span>
                 )}
               </span>
               <form action={logout}>
-                <button className="btn px-2 py-1 text-xs" type="submit">
+                <button className="btn px-2.5 py-1 text-xs" type="submit">
                   Log out
                 </button>
               </form>

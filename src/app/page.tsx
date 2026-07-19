@@ -43,7 +43,7 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-extrabold">{season.name}</h1>
-        <span className="rounded border-2 border-ink bg-team-blue px-2 py-0.5 text-xs font-bold uppercase">
+        <span className="rounded border border-line bg-team-blue px-2 py-0.5 text-xs font-bold uppercase">
           {season.ageGroup} · {season.term} {season.year}
         </span>
       </div>
@@ -58,12 +58,12 @@ export default async function DashboardPage() {
         {upcoming.length === 0 ? (
           <p className="text-sm text-neutral-600">Nothing scheduled yet.</p>
         ) : (
-          <ul className="divide-y-2 divide-ink/10">
+          <ul className="divide-y divide-line">
             {upcoming.map((e) => {
               const counts = headcount(rsvps.get(e.id));
               return (
                 <li key={e.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2">
-                  <span className="w-24 shrink-0 rounded border border-ink bg-team-blue-light px-1.5 py-0.5 text-center text-xs font-bold">
+                  <span className="w-24 shrink-0 rounded border border-line bg-team-blue-light px-1.5 py-0.5 text-center text-xs font-bold">
                     {EVENT_TYPE_LABEL[e.type]}
                   </span>
                   <Link href={`/schedule/${e.id}`} className="min-w-0 flex-1 basis-52 font-semibold underline-offset-2 hover:underline">
