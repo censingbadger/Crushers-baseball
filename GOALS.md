@@ -19,7 +19,7 @@ so families have one place to look (goal 10).
 | Role          | What they can do                                                                                                    |
 | ------------- | ------------------------------------------------------------------------------------------------------------------- |
 | Coach/manager | Everything: roster, schedule, ratings, position matrix, lineups, pitch counts, stats, reports, announcements         |
-| Parent        | See the schedule and their own player's progress and reports, RSVP availability, enter family availability windows, and score a game manually when acting as scorekeeper |
+| Parent        | See the schedule and their own player's progress, reports, page, and cues; run guided practice workouts with their player; RSVP availability; enter family availability windows; and score a game manually when acting as scorekeeper |
 | Player        | Their own page, opened from a parent's device: avatar, goals, recommended practice sessions, self-logged extra workouts, and teammates' goals and effort progress |
 
 Players do not get email accounts or standalone logins — their page opens
@@ -65,7 +65,9 @@ through a parent-mediated kid mode (see goal 12).
 - Per-player **development notes** travel with the ratings — like the
   pitching "tendency → cue" notes coaches keep in the Sheet today (e.g.
   "lets arm get in front of body" → "let the arm be pulled by the body").
-  Coach-only by default, shareable per note.
+  Coach-only by default, shareable per note; cues a coach shares (swing
+  thoughts, pitching cues) surface prominently on the player and parent
+  pages and inside guided workouts (goal 12).
 - **Aspirational goals** live alongside ratings: each player's season goals
   and the positions they want to play. The rating form surfaces these so
   feedback during practices and games ties back to what the player is
@@ -255,14 +257,30 @@ device — kid mode, no child email accounts), built around one question:
 - **Extra-workout counter and forgiving streaks**: running totals and
   milestone badges for consistency (5, 10, 25 sessions). No penalty
   states — a missed week pauses a streak, it doesn't shame.
+- **"I've got free time"**: one button for a player (or parent) with spare
+  time. Tap it, say how much time you have — 15, 30, 45, 60 minutes — and
+  the app assembles a workout to fit, from the drill library and the
+  player's goals. **Start Workout** then walks through it segment by
+  segment with a timer and a beep at each transition: 10 minutes of long
+  toss → *beep* → 10 minutes of blocking drills in gear → *beep* → tee
+  work, with the player's swing thoughts on screen for that segment.
+- **My cues, front and center**: the swing thoughts and pitching cues a
+  coach has shared appear prominently on the player page (and the parent's
+  view), phrased as what *to do* — so practice at home reinforces the same
+  coaching as practice with the team, and the cues are easy to remember
+  when families plan their own sessions.
 - **Teammates striving together**: players can see each other's goals and
   effort progress bars — listed alphabetically, never ranked — plus
   team-wide totals ("the Crushers logged 40 extra sessions this month")
   and celebrations when a teammate hits an effort milestone.
-- **What the page never shows**: coach ratings, rating trends, specific
-  coaching feedback, skill comparisons, or rankings of any kind. Critique
-  reaches players through coaches in person and parents via reports; this
-  page is where motivation lives.
+- **Grown-ups see the same page**: the player's parents see everything on
+  their player's page, and coaches see every player's page — same
+  content, nothing extra mixed in.
+- **What the page never shows**: coach ratings, rating trends, skill
+  comparisons, or rankings of any kind. The only coaching content is what
+  a coach deliberately shares as actionable cues, always phrased as what
+  to do. Critique reaches players through coaches in person and parents
+  via reports; this page is where motivation lives.
 - Design principles for 11-year-olds: effort over outcome,
   self-comparison over peer comparison, encouraging kid-readable copy, and
   always one small, completable next step.
@@ -315,6 +333,8 @@ device — kid mode, no child email accounts), built around one question:
   their goal bar move.
 - A player can restyle their whole page — colors, font, wallpaper — in
   under a minute.
+- "I have 30 minutes" produces a goal-matched workout instantly and walks
+  through it with timers and beeps — zero planning required.
 - Nothing on a player page ever shows a rating, a ranking, or raw coaching
   feedback.
 - It is impossible to put an ineligible pitcher on the mound without a
@@ -343,4 +363,5 @@ device — kid mode, no child email accounts), built around one question:
   + weekend allocation + lineup solver (the centerpiece); (3) the dugout
   dashboard + pitch safety + live scoring feed; (4) stats import + manual
   entry; (5) AI reports; (6) availability planning & signups; (7) player
-  pages with avatars and the drill library.
+  pages with avatars, shared cues, the drill library, and the guided
+  workout player.
