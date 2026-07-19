@@ -1,5 +1,6 @@
 [build]
   command = "npm run build"
+  publish = ".next"
 
 # The app runs its drizzle migrations at boot, so the SQL files must ship
 # inside the serverless function bundle — without this every database

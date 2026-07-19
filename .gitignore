@@ -42,3 +42,10 @@ next-env.d.ts
 
 # local embedded database
 .data/
+
+# Local Netlify folder
+.netlify
+
+# netlify-cli local artifacts
+deno.lock
+.netlify/

@@ -231,6 +231,36 @@ export async function unlinkGuardianPlayer(formData: FormData): Promise<void> {
   revalidatePath("/families");
 }
 
+/**
+ * Promote a parent to coach or demote a coach to parent. The last
+ * remaining coach can never be demoted — someone must hold the keys.
+ */
+export async function setUserRole(formData: FormData): Promise<void> {
+  await requireCoach();
+  const userId = String(formData.get("userId") ?? "");
+  const role = String(formData.get("role") ?? "");
+  if (!userId || (role !== "coach" && role !== "parent")) return;
+  const db = await getDb();
+  const [target] = await db
+    .select({ id: tables.users.id, role: tables.users.role })
+    .from(tables.users)
+    .where(eq(tables.users.id, userId))
+    .limit(1);
+  if (!target || target.role === role) return;
+  if (target.role === "coach" && role === "parent") {
+    const coaches = await db
+      .select({ id: tables.users.id })
+      .from(tables.users)
+      .where(eq(tables.users.role, "coach"));
+    if (coaches.length <= 1) return; // never demote the last coach
+  }
+  await db
+    .update(tables.users)
+    .set({ role })
+    .where(eq(tables.users.id, userId));
+  revalidatePath("/families");
+}
+
 /** Add another coach account (e.g. the second coach's sheet MB/MC). */
 export async function addCoach(formData: FormData): Promise<IssuedCredential | null> {
   await requireCoach();

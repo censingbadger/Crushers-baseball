@@ -282,6 +282,24 @@ await page
   .locator("tr", { hasText: "Kim Delgado" })
   .locator("text=revoked")
   .waitFor({ timeout: 15000 });
+
+// Roles: promote Dana to coach, then demote back to parent.
+await page
+  .locator("tr", { hasText: "Dana Ramos" })
+  .locator("button:has-text('make coach')")
+  .click();
+await page
+  .locator("li", { hasText: "Dana Ramos" })
+  .waitFor({ timeout: 15000 });
+await page
+  .locator("li", { hasText: "Dana Ramos" })
+  .locator("button:has-text('make parent')")
+  .click();
+await page.waitForTimeout(1000);
+const rolesAfter = await page.textContent("main");
+if (rolesAfter?.match(/Coaches[\s\S]*Dana Ramos[\s\S]*Add a coach/)) {
+  fail("demotion back to parent did not stick");
+}
 await page.screenshot({ path: `${SHOTS}/15-families.png`, fullPage: true });
 
 // Log out, log in as parent, RSVP for own player on the next practice.
@@ -398,6 +416,28 @@ await page.fill("#email", "kim@demo.crushersblue.example");
 await page.fill("#password", kimPassword ?? "");
 await page.click("button[type=submit]");
 await page.waitForURL("**error=invalid**");
+
+// Self-service settings: Perry changes his password and Milo's details.
+await page.fill("#email", "parent@demo.crushersblue.example");
+await page.fill("#password", "family-demo");
+await page.click("button[type=submit]");
+await page.waitForURL(BASE + "/");
+await page.goto(BASE + "/account");
+await page.fill("#current", "family-demo");
+await page.fill("#next", "family-demo-2");
+await page.fill("#confirm", "family-demo-2");
+await page.click("button:has-text('Update password')");
+await page.waitForURL("**saved=password**");
+await page.locator("input[name='school']").first().fill("Demo Elementary");
+await page.locator('button:has-text("Save Milo")').click();
+await page.waitForURL("**saved=player**");
+// The new password signs in.
+await page.click("header form button");
+await page.waitForURL("**/login");
+await page.fill("#email", "parent@demo.crushersblue.example");
+await page.fill("#password", "family-demo-2");
+await page.click("button[type=submit]");
+await page.waitForURL(BASE + "/");
 
 console.log("SMOKE OK");
 await browser.close();

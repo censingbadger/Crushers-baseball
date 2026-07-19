@@ -6,6 +6,7 @@ import {
   linkGuardianPlayer,
   removeGuardian,
   revokeLogin,
+  setUserRole,
   unlinkGuardianPlayer,
 } from "./actions";
 import { AddCoachForm, AddFamilyForm, CredsPanel, ResetButton } from "./CredsPanel";
@@ -163,6 +164,19 @@ export default async function FamiliesPage() {
                           </button>
                         </form>
                       )}
+                      {account && !revoked && account.role === "parent" && (
+                        <form action={setUserRole}>
+                          <input type="hidden" name="userId" value={account.id} />
+                          <input type="hidden" name="role" value="coach" />
+                          <button
+                            className="text-xs text-team-blue-dark underline"
+                            title="Coaches see contacts, ratings, and all tools"
+                            type="submit"
+                          >
+                            make coach
+                          </button>
+                        </form>
+                      )}
                       {!account && (
                         <form action={removeGuardian}>
                           <input type="hidden" name="guardianId" value={g.id} />
@@ -192,9 +206,36 @@ export default async function FamiliesPage() {
       <section className="card p-4">
         <h2 className="mb-1 text-lg font-bold">Coaches</h2>
         <p className="mb-3 text-xs text-neutral-600">
-          Coaches see everything — contacts, ratings, and all tools. Current:{" "}
-          {coaches.map((c) => c.displayName).join(", ")}.
+          Coaches see everything — contacts, ratings, and all tools.
         </p>
+        <ul className="mb-3 divide-y divide-line">
+          {coaches.map((c) => (
+            <li key={c.id} className="flex flex-wrap items-center gap-2 py-1.5 text-sm">
+              <span className="font-semibold">{c.displayName}</span>
+              <span className="text-neutral-500">{c.email}</span>
+              {coaches.length > 1 ? (
+                <form action={setUserRole} className="ml-auto">
+                  <input type="hidden" name="userId" value={c.id} />
+                  <input type="hidden" name="role" value="parent" />
+                  <button
+                    className="text-xs text-team-blue-dark underline"
+                    title="Back to a family account"
+                    type="submit"
+                  >
+                    make parent
+                  </button>
+                </form>
+              ) : (
+                <span
+                  className="ml-auto text-xs text-neutral-400"
+                  title="Someone has to hold the keys"
+                >
+                  last coach
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
         <AddCoachForm />
       </section>
     </div>
