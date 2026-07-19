@@ -244,6 +244,11 @@ await page.click("button:has-text('Approve & publish')");
 await page.waitForURL("**published=1**");
 await page.screenshot({ path: `${SHOTS}/13-report.png`, fullPage: true });
 
+// Drill library: coach loads the starter set (feeds guided workouts).
+await page.goto(BASE + "/drills");
+await page.click("button:has-text('Load starter drills')");
+await page.locator("text=Long toss").first().waitFor({ timeout: 15000 });
+
 // Log out, log in as parent, RSVP for own player on the next practice.
 await page.click("header form button");
 await page.waitForURL("**/login");
@@ -279,6 +284,35 @@ if (!parentProgress?.includes("Monthly reports from the coaching staff")) {
 if (!parentProgress?.includes("Dear Milo's family, (reviewed)")) {
   fail("parent progress missing the published (edited) report text");
 }
+
+// Player pages: the parent can open exactly one page — Milo's.
+await page.goto(BASE + "/players");
+const openable = await page.locator("a[href^='/players/']").count();
+if (openable !== 1) fail(`parent should open exactly 1 player page (got ${openable})`);
+await page.click("a[href^='/players/']");
+await page.waitForURL("**/players/**");
+const heroName = await page.textContent("h1");
+if (!heroName?.includes("Milo")) fail("parent player page is not Milo's");
+
+// Guided workout: start 10 minutes, skip through, verify it logs.
+await page.click("button:has-text('10 min')");
+await page.locator("[data-testid=workout-timer]").waitFor({ timeout: 10000 });
+for (let i = 0; i < 8; i++) {
+  if ((await page.locator("button:has-text('Done early')").count()) === 0) break;
+  await page.click("button:has-text('Done early')");
+  await page.waitForTimeout(350);
+}
+await page.locator("text=Great work").waitFor({ timeout: 15000 });
+await page.locator("text=Logged").waitFor({ timeout: 15000 });
+const playerPageText = await page.textContent("main");
+if (playerPageText?.includes("Secret cue text")) {
+  fail("player page leaked a coach-only note");
+}
+if (!playerPageText?.includes("Quick glove to the dirt")) {
+  fail("player page missing shared focus cue");
+}
+if (!playerPageText?.includes("My teammates")) fail("player page missing teammates");
+await page.screenshot({ path: `${SHOTS}/14-playerpage.png`, fullPage: true });
 
 // Parent taps Milo's first tournament-day cell; it cycles and persists.
 await page.goto(BASE + "/availability");

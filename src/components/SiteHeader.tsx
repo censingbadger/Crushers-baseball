@@ -7,6 +7,7 @@ import { NavLinks, type NavItem } from "@/components/NavLinks";
 const EVERYONE: NavItem[] = [
   { href: "/schedule", label: "Schedule" },
   { href: "/roster", label: "Roster" },
+  { href: "/players", label: "Players" },
   { href: "/availability", label: "Availability" },
   { href: "/progress", label: "Progress" },
   { href: "/stats", label: "Stats" },
@@ -19,6 +20,7 @@ const COACH: NavItem[] = [
   { href: "/matrix", label: "Matrix" },
   { href: "/lineup", label: "Lineup" },
   { href: "/weekend", label: "Weekend" },
+  { href: "/drills", label: "Drills" },
   { href: "/import", label: "Import" },
 ];
 
