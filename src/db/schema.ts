@@ -389,6 +389,72 @@ export const pitchCounts = pgTable(
   (t) => [uniqueIndex("pitch_once").on(t.gameId, t.playerId, t.inning)],
 );
 
+// Stats (goal 5). GameChanger stays the scorer; its season export imports
+// as a replaceable snapshot, while manual box scores cover scrimmages and
+// events without GC. Innings pitched are stored as outs to avoid the
+// "3.2 innings" decimal trap.
+export type StatSource = "gc" | "manual";
+
+export const statGames = pgTable("stat_games", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  seasonId: uuid("season_id")
+    .notNull()
+    .references(() => seasons.id),
+  source: text("source").$type<StatSource>().notNull(),
+  label: text("label").notNull(),
+  opponent: text("opponent"),
+  gameDate: date("game_date").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const battingLines = pgTable(
+  "batting_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    statGameId: uuid("stat_game_id")
+      .notNull()
+      .references(() => statGames.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    ab: integer("ab").notNull().default(0),
+    r: integer("r").notNull().default(0),
+    h: integer("h").notNull().default(0),
+    doubles: integer("doubles").notNull().default(0),
+    triples: integer("triples").notNull().default(0),
+    hr: integer("hr").notNull().default(0),
+    rbi: integer("rbi").notNull().default(0),
+    bb: integer("bb").notNull().default(0),
+    k: integer("k").notNull().default(0),
+    sb: integer("sb").notNull().default(0),
+    hbp: integer("hbp").notNull().default(0),
+    sf: integer("sf").notNull().default(0),
+  },
+  (t) => [uniqueIndex("batting_line_once").on(t.statGameId, t.playerId)],
+);
+
+export const pitchingLines = pgTable(
+  "pitching_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    statGameId: uuid("stat_game_id")
+      .notNull()
+      .references(() => statGames.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    outs: integer("outs").notNull().default(0),
+    bf: integer("bf").notNull().default(0),
+    pitches: integer("pitches").notNull().default(0),
+    h: integer("h").notNull().default(0),
+    r: integer("r").notNull().default(0),
+    er: integer("er").notNull().default(0),
+    bb: integer("bb").notNull().default(0),
+    k: integer("k").notNull().default(0),
+  },
+  (t) => [uniqueIndex("pitching_line_once").on(t.statGameId, t.playerId)],
+);
+
 // Family availability for potential tournament weekends (goal 7). Distinct
 // from event RSVPs: these are "could we play that day" answers used to pick
 // which tournaments to enter.
