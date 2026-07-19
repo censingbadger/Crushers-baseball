@@ -1,6 +1,7 @@
 import { requireCoach } from "@/lib/auth";
 import { ImportForm } from "./ImportForm";
 import {
+  importCues,
   importPracticeGrid,
   importRoster,
   importTournamentGrid,
@@ -35,6 +36,11 @@ export default async function ImportPage() {
         title="3 · Tournament Availability tab"
         description="Imports family availability for potential tournament weekends into the Availability page. Import the roster first so names match."
         action={importTournamentGrid}
+      />
+      <ImportForm
+        title="4 · Pitching cues (optional)"
+        description={'CSV rows of "Player,Tendency,Cue" (no header needed). Loads the tendency→cue pairs coaches keep — coach-only until shared from a player’s page.'}
+        action={importCues}
       />
     </div>
   );

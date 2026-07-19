@@ -249,6 +249,41 @@ await page.goto(BASE + "/drills");
 await page.click("button:has-text('Load starter drills')");
 await page.locator("text=Long toss").first().waitFor({ timeout: 15000 });
 
+// Family logins: generate for the seeded pending guardian, capture the
+// one-time credentials for a real login later in the run.
+await page.goto(BASE + "/families");
+const famText = await page.textContent("main");
+if (!famText?.includes("Dana Ramos")) fail("families page missing pending guardian");
+await page.click("button:has-text('Generate 1 family login')");
+await page.locator("[data-testid=cred-password]").first().waitFor({ timeout: 15000 });
+const newFamilyEmail = (
+  await page.locator("[data-testid=cred-email]").first().textContent()
+)?.trim();
+const newFamilyPassword = (
+  await page.locator("[data-testid=cred-password]").first().textContent()
+)?.trim();
+if (!newFamilyEmail || !newFamilyPassword) fail("family credentials not shown");
+
+// Admin: add a family member by hand, then revoke their access.
+await page.fill("#fam-first", "Kim");
+await page.fill("#fam-last", "Delgado");
+await page.fill("#fam-email", "kim@demo.crushersblue.example");
+await page.selectOption("#fam-player", { index: 1 });
+await page.click("button:has-text('Add family member')");
+await page.locator("[data-testid=new-member-password]").waitFor({ timeout: 15000 });
+const kimPassword = (
+  await page.locator("[data-testid=new-member-password]").textContent()
+)?.trim();
+await page
+  .locator("tr", { hasText: "Kim Delgado" })
+  .locator("button:has-text('revoke access')")
+  .click();
+await page
+  .locator("tr", { hasText: "Kim Delgado" })
+  .locator("text=revoked")
+  .waitFor({ timeout: 15000 });
+await page.screenshot({ path: `${SHOTS}/15-families.png`, fullPage: true });
+
 // Log out, log in as parent, RSVP for own player on the next practice.
 await page.click("header form button");
 await page.waitForURL("**/login");
@@ -339,6 +374,30 @@ await page.waitForTimeout(800);
 const rowText = await row.textContent();
 if (!rowText?.includes("Maybe")) fail("RSVP update did not stick");
 await page.screenshot({ path: `${SHOTS}/05-event-parent.png`, fullPage: true });
+
+// The freshly generated family login works and is scoped to its own player.
+await page.click("header form button");
+await page.waitForURL("**/login");
+await page.fill("#email", newFamilyEmail);
+await page.fill("#password", newFamilyPassword);
+await page.click("button[type=submit]");
+await page.waitForURL(BASE + "/");
+await page.goto(BASE + "/progress");
+const danaProgress = await page.textContent("main");
+if (!danaProgress?.includes("Theo Ramos")) {
+  fail("generated family login does not see its own player");
+}
+if (danaProgress?.includes("Milo Vance")) {
+  fail("generated family login sees another family's player");
+}
+
+// A revoked login must not work.
+await page.click("header form button");
+await page.waitForURL("**/login");
+await page.fill("#email", "kim@demo.crushersblue.example");
+await page.fill("#password", kimPassword ?? "");
+await page.click("button[type=submit]");
+await page.waitForURL("**error=invalid**");
 
 console.log("SMOKE OK");
 await browser.close();

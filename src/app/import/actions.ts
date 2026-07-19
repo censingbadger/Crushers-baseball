@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getDb, tables } from "@/db";
 import { requireCoach } from "@/lib/auth";
 import {
+  runCuesImport,
   runPracticeGridImport,
   runRosterImport,
   runTournamentGridImport,
@@ -39,13 +40,45 @@ export async function importRoster(
   await requireCoach();
   const csv = await readCsv(formData);
   if (!csv) return { ok: false, summary: [], warnings: ["Choose a CSV file first."] };
-  const { db, season, team } = await activeContext();
-  if (!season || !team) {
-    return { ok: false, summary: [], warnings: ["No active season — seed the app first."] };
+  let { db, season, team } = await activeContext();
+  // First import on a fresh deployment: create the team and season so a
+  // new coach can go from empty database to full roster in one upload.
+  if (!team) {
+    [team] = await db
+      .insert(tables.teams)
+      .values({ name: "Crushers Blue", slug: "crushers-blue" })
+      .returning();
+  }
+  if (!season) {
+    const year = new Date().getFullYear();
+    [season] = await db
+      .insert(tables.seasons)
+      .values({
+        teamId: team.id,
+        year,
+        term: "summer",
+        ageGroup: "11U",
+        name: `${team.name} ${year} Summer`,
+        isActive: true,
+      })
+      .returning();
   }
   const result = await runRosterImport(db, team.id, season.id, season.year, csv);
   revalidatePath("/roster");
   revalidatePath("/");
+  return { ok: true, ...result };
+}
+
+export async function importCues(
+  _prev: ImportResult | null,
+  formData: FormData,
+): Promise<ImportResult> {
+  await requireCoach();
+  const csv = await readCsv(formData);
+  if (!csv) return { ok: false, summary: [], warnings: ["Choose a CSV file first."] };
+  const { db } = await activeContext();
+  const result = await runCuesImport(db, csv);
+  revalidatePath("/progress");
   return { ok: true, ...result };
 }
 

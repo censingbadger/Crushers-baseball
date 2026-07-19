@@ -119,6 +119,22 @@ async function main() {
     role: "parent",
     guardianId: guardian.id,
   });
+  // A guardian with an email but no login yet — the Families page's
+  // "generate logins" flow picks this one up.
+  const [pendingGuardian] = await db
+    .insert(tables.guardians)
+    .values({
+      teamId: team.id,
+      firstName: "Dana",
+      lastName: "Ramos",
+      email: "dana@demo.crushersblue.example",
+      phone: "555-0101",
+    })
+    .returning();
+  await db.insert(tables.playerGuardians).values({
+    playerId: playerIds[1],
+    guardianId: pendingGuardian.id,
+  });
 
   const [pastPractice] = await db
     .insert(tables.events)
