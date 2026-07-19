@@ -4,12 +4,13 @@ const nextConfig: NextConfig = {
   // PGlite loads its WASM from disk at runtime; bundling breaks its asset
   // paths, so it must stay external on the server.
   serverExternalPackages: ["@electric-sql/pglite"],
-  // The drizzle migration files are read at boot; include them in the
-  // serverless trace for every route so hosted bundles always ship them.
+  // Read at runtime, invisible to static tracing: the drizzle migration
+  // files (boot) and PGlite's WASM assets (the no-database fallback).
+  // Include both in the serverless trace for every route.
   outputFileTracingIncludes: {
-    "/": ["./drizzle/**/*"],
-    "/*": ["./drizzle/**/*"],
-    "/**": ["./drizzle/**/*"],
+    "/": ["./drizzle/**/*", "./node_modules/@electric-sql/pglite/dist/**/*"],
+    "/*": ["./drizzle/**/*", "./node_modules/@electric-sql/pglite/dist/**/*"],
+    "/**": ["./drizzle/**/*", "./node_modules/@electric-sql/pglite/dist/**/*"],
   },
 };
 
