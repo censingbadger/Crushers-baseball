@@ -79,7 +79,7 @@ export default async function GamesPage() {
                 >
                   {g.status}
                 </span>
-                <Link href={`/game/${g.id}`} className="flex-1 font-semibold underline-offset-2 hover:underline">
+                <Link href={`/game/${g.id}`} className="min-w-0 flex-1 basis-52 font-semibold underline-offset-2 hover:underline">
                   {g.label}
                   {g.opponent && <span className="text-neutral-600"> vs {g.opponent}</span>}
                   <span className="ml-2 text-xs text-neutral-500">{g.gameDate}</span>
