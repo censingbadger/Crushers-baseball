@@ -20,8 +20,10 @@ so families have one place to look (goal 10).
 | ------------- | ------------------------------------------------------------------------------------------------------------------- |
 | Coach/manager | Everything: roster, schedule, ratings, position matrix, lineups, pitch counts, stats, reports, announcements         |
 | Parent        | See the schedule and their own player's progress and reports, RSVP availability, enter family availability windows, and score a game manually when acting as scorekeeper |
+| Player        | Their own page, opened from a parent's device: avatar, goals, recommended practice sessions, self-logged extra workouts, and teammates' goals and effort progress |
 
-Players do not get their own logins (see "Out of scope").
+Players do not get email accounts or standalone logins — their page opens
+through a parent-mediated kid mode (see goal 12).
 
 ## Goals
 
@@ -68,7 +70,8 @@ Players do not get their own logins (see "Out of scope").
   and the positions they want to play. The rating form surfaces these so
   feedback during practices and games ties back to what the player is
   working toward. Coaches choose which elements are shared with parents and
-  which stay in coach-only notes.
+  which stay in coach-only notes. Shared goals also power the player pages
+  (goal 12).
 
 ### 3. Position matrix & lineup intelligence (the centerpiece)
 
@@ -228,10 +231,42 @@ Summer 2026"). Every one of its features has a home in the app:
   because of goal 9, a future Crushers team gets its own look without code
   changes.
 
+### 12. Player pages — a growth space for the kids
+
+Each player gets a page of their own to check (opened through a parent's
+device — kid mode, no child email accounts), built around one question:
+**"what can I do today to get closer to my goals?"**
+
+- **Avatar**: build a cool baseball avatar (team-colored caps, jerseys,
+  bats, gloves) or upload their own picture. The page should feel like
+  *theirs* — ownership is what brings an 11-year-old back.
+- **My goals, as progress bars**: the season's aspirational goals (from
+  goal 2) shown as bars that fill from actions the player controls —
+  extra practice sessions logged — never from coach judgments.
+- **Recommended practice sessions**: a coach-curated drill library mapped
+  to goal types ("wants to catch" → blocking and framing sessions; "hit
+  with more power" → tee routines), so the page always offers one concrete
+  next session. Logging a completed session takes seconds.
+- **Extra-workout counter and forgiving streaks**: running totals and
+  milestone badges for consistency (5, 10, 25 sessions). No penalty
+  states — a missed week pauses a streak, it doesn't shame.
+- **Teammates striving together**: players can see each other's goals and
+  effort progress bars — listed alphabetically, never ranked — plus
+  team-wide totals ("the Crushers logged 40 extra sessions this month")
+  and celebrations when a teammate hits an effort milestone.
+- **What the page never shows**: coach ratings, rating trends, specific
+  coaching feedback, skill comparisons, or rankings of any kind. Critique
+  reaches players through coaches in person and parents via reports; this
+  page is where motivation lives.
+- Design principles for 11-year-olds: effort over outcome,
+  self-comparison over peer comparison, encouraging kid-readable copy, and
+  always one small, completable next step.
+
 ## Out of scope (for now)
 
 - Fees and payment tracking
-- Player logins
+- Player email accounts or standalone player logins — player pages are
+  parent-mediated (goal 12)
 - Native iOS/Android apps — the web app must simply work well on phones
 - Replacing GameChanger as the league-facing scoring system (our manual
   scoring is a fallback, not a migration)
@@ -271,6 +306,10 @@ Summer 2026"). Every one of its features has a home in the app:
   and nothing it did is lost.
 - A four-game weekend's innings allocation balances every position and
   bench slot automatically.
+- A player can log an extra practice session in under 15 seconds and watch
+  their goal bar move.
+- Nothing on a player page ever shows a rating, a ranking, or raw coaching
+  feedback.
 - It is impossible to put an ineligible pitcher on the mound without a
   warning.
 
@@ -296,4 +335,5 @@ Summer 2026"). Every one of its features has a home in the app:
   roles, branding theme, Google Sheet import; (2) ratings + position matrix
   + weekend allocation + lineup solver (the centerpiece); (3) the dugout
   dashboard + pitch safety + live scoring feed; (4) stats import + manual
-  entry; (5) AI reports; (6) availability planning & signups.
+  entry; (5) AI reports; (6) availability planning & signups; (7) player
+  pages with avatars and the drill library.
