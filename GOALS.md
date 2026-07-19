@@ -240,6 +240,11 @@ device — kid mode, no child email accounts), built around one question:
 - **Avatar**: build a cool baseball avatar (team-colored caps, jerseys,
   bats, gloves) or upload their own picture. The page should feel like
   *theirs* — ownership is what brings an 11-year-old back.
+- **Their page, their look**: pick the background color, border colors, and
+  font from kid-friendly presets, and upload a wallpaper — easy dials that
+  make the page feel hand-decorated, not configured. Curated presets keep
+  every combination readable, and wallpapers are visible only inside the
+  team.
 - **My goals, as progress bars**: the season's aspirational goals (from
   goal 2) shown as bars that fill from actions the player controls —
   extra practice sessions logged — never from coach judgments.
@@ -308,6 +313,8 @@ device — kid mode, no child email accounts), built around one question:
   bench slot automatically.
 - A player can log an extra practice session in under 15 seconds and watch
   their goal bar move.
+- A player can restyle their whole page — colors, font, wallpaper — in
+  under a minute.
 - Nothing on a player page ever shows a rating, a ranking, or raw coaching
   feedback.
 - It is impossible to put an ineligible pitcher on the mound without a
