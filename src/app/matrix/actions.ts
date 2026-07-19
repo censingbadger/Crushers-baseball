@@ -5,13 +5,11 @@ import { eq } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { z } from "zod";
 import { getDb, tables } from "@/db";
-import { POSITIONS, type Position } from "@/db/schema";
+import { POSITIONS } from "@/db/schema";
 import { requireCoach } from "@/lib/auth";
 import { insertRatingIfChanged } from "@/lib/matrix";
-import {
-  parseMatrixSheets,
-  type MatrixSheet,
-} from "@/lib/importers/matrix";
+import { runMatrixImport } from "@/lib/import-runner";
+import type { MatrixSheet } from "@/lib/importers/matrix";
 import type { ImportResult } from "@/app/import/actions";
 
 const saveRowSchema = z.object({
@@ -86,41 +84,7 @@ export async function importMatrixXlsx(
     return { ok: false, summary: [], warnings: ["Could not read that file as .xlsx."] };
   }
 
-  const roster = await db
-    .select({
-      id: tables.players.id,
-      firstName: tables.players.firstName,
-      lastName: tables.players.lastName,
-    })
-    .from(tables.players);
-
-  const { sheets: parsed, warnings } = parseMatrixSheets(sheets, roster);
-  let written = 0;
-  let skippedUnchanged = 0;
-  for (const sheet of parsed) {
-    for (const r of sheet.ratings) {
-      const changed = await insertRatingIfChanged({
-        seasonId: season.id,
-        playerId: r.playerId!,
-        position: r.position as Position,
-        rating: r.rating,
-        rater: sheet.rater,
-        createdByUserId: user.id,
-      });
-      if (changed) written++;
-      else skippedUnchanged++;
-    }
-  }
-
+  const result = await runMatrixImport(db, season.id, sheets, user.id);
   revalidatePath("/matrix");
-  return {
-    ok: true,
-    summary: [
-      `${parsed.length} coach sheet${parsed.length === 1 ? "" : "s"} imported (${parsed
-        .map((s) => s.rater)
-        .join(", ")}).`,
-      `${written} ratings recorded, ${skippedUnchanged} unchanged.`,
-    ],
-    warnings,
-  };
+  return { ok: true, ...result };
 }
