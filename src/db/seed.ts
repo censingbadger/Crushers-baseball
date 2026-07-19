@@ -1,0 +1,196 @@
+/*
+ * Seeds a demo team so the app is explorable out of the box.
+ * All names here are fictional — real roster data enters through
+ * the Import page, never through the repository.
+ *
+ * Run: npm run seed   (re-run after deleting .data/ to reset)
+ */
+import bcrypt from "bcryptjs";
+import { getDb, tables } from "./index";
+
+const DEMO_COACH = { email: "coach@demo.crushersblue.example", password: "dugout-demo" };
+const DEMO_PARENT = { email: "parent@demo.crushersblue.example", password: "family-demo" };
+
+const PLAYERS: {
+  first: string;
+  last: string;
+  jersey: number | null;
+  positions: string;
+  status: "full" | "practice";
+}[] = [
+  { first: "Milo", last: "Vance", jersey: 2, positions: "P, SS", status: "full" },
+  { first: "Theo", last: "Ramos", jersey: 5, positions: "C, 1B", status: "full" },
+  { first: "Jax", last: "Turner", jersey: 7, positions: "CF, P", status: "full" },
+  { first: "Eli", last: "Brooks", jersey: 9, positions: "2B, SS", status: "full" },
+  { first: "Sam", last: "Whitfield", jersey: 11, positions: "3B, P", status: "full" },
+  { first: "Leo", last: "Castillo", jersey: 13, positions: "LF, RF", status: "full" },
+  { first: "Max", last: "Porter", jersey: 17, positions: "1B, 3B", status: "full" },
+  { first: "Finn", last: "Delgado", jersey: 21, positions: "RF, CF", status: "full" },
+  { first: "Nate", last: "Sherman", jersey: 24, positions: "C, 2B", status: "full" },
+  { first: "Cole", last: "Bryant", jersey: 33, positions: "P, LF", status: "full" },
+  { first: "Ryder", last: "Quinn", jersey: null, positions: "OF", status: "practice" },
+];
+
+function at(daysFromNow: number, hour: number, minute = 0): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  d.setHours(hour, minute, 0, 0);
+  return d;
+}
+
+function isoDay(daysFromNow: number): string {
+  const d = at(daysFromNow, 12);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+async function main() {
+  const db = await getDb();
+
+  const existing = await db.select().from(tables.teams).limit(1);
+  if (existing.length > 0) {
+    console.log("Already seeded — delete .data/ to reset, then re-run.");
+    return;
+  }
+
+  const [team] = await db
+    .insert(tables.teams)
+    .values({ name: "Crushers Blue", slug: "crushers-blue" })
+    .returning();
+
+  const [season] = await db
+    .insert(tables.seasons)
+    .values({
+      teamId: team.id,
+      year: new Date().getFullYear(),
+      term: "summer",
+      ageGroup: "11U",
+      name: `Crushers Blue ${new Date().getFullYear()} Summer`,
+      isActive: true,
+    })
+    .returning();
+
+  await db.insert(tables.users).values({
+    email: DEMO_COACH.email,
+    passwordHash: bcrypt.hashSync(DEMO_COACH.password, 10),
+    displayName: "Coach Demo",
+    role: "coach",
+  });
+
+  const playerIds: string[] = [];
+  for (const p of PLAYERS) {
+    const [player] = await db
+      .insert(tables.players)
+      .values({ teamId: team.id, firstName: p.first, lastName: p.last })
+      .returning();
+    playerIds.push(player.id);
+    await db.insert(tables.rosterEntries).values({
+      seasonId: season.id,
+      playerId: player.id,
+      jerseyNumber: p.jersey,
+      status: p.status,
+      positions: p.positions,
+    });
+  }
+
+  // One demo parent family attached to the first player.
+  const [guardian] = await db
+    .insert(tables.guardians)
+    .values({
+      teamId: team.id,
+      firstName: "Perry",
+      lastName: "Vance",
+      email: DEMO_PARENT.email,
+      phone: "555-0100",
+    })
+    .returning();
+  await db.insert(tables.playerGuardians).values({
+    playerId: playerIds[0],
+    guardianId: guardian.id,
+  });
+  await db.insert(tables.users).values({
+    email: DEMO_PARENT.email,
+    passwordHash: bcrypt.hashSync(DEMO_PARENT.password, 10),
+    displayName: "Perry Vance",
+    role: "parent",
+    guardianId: guardian.id,
+  });
+
+  const [pastPractice] = await db
+    .insert(tables.events)
+    .values({
+      seasonId: season.id,
+      type: "practice",
+      startsAt: at(-3, 17, 30),
+      endsAt: at(-3, 19, 0),
+      location: "White Cross",
+    })
+    .returning();
+  const [practice1] = await db
+    .insert(tables.events)
+    .values({
+      seasonId: season.id,
+      type: "practice",
+      startsAt: at(2, 17, 30),
+      endsAt: at(2, 19, 0),
+      location: "White Cross",
+    })
+    .returning();
+  await db.insert(tables.events).values({
+    seasonId: season.id,
+    type: "practice",
+    startsAt: at(7, 17, 30),
+    endsAt: at(7, 19, 0),
+    location: "White Cross",
+  });
+  await db.insert(tables.events).values({
+    seasonId: season.id,
+    type: "tournament",
+    title: "Summer Slam Classic",
+    startsAt: at(12, 8, 0),
+    endsAt: at(14, 18, 0),
+    location: "Riverside Park",
+    notes: "Four-game guarantee. Arrival 45 minutes before first pitch.",
+  });
+
+  // A believable spread of RSVPs for the next practice.
+  const answers = ["yes", "yes", "yes", "no", "maybe", "yes", "yes", "no", "yes", "yes", "maybe"] as const;
+  for (let i = 0; i < playerIds.length; i++) {
+    await db.insert(tables.rsvps).values({
+      eventId: practice1.id,
+      playerId: playerIds[i],
+      status: answers[i],
+    });
+    await db.insert(tables.rsvps).values({
+      eventId: pastPractice.id,
+      playerId: playerIds[i],
+      status: i % 3 === 0 ? "no" : "yes",
+    });
+  }
+
+  await db.insert(tables.signups).values({
+    eventId: practice1.id,
+    kind: "helper",
+    guardianName: "Perry Vance",
+    note: "bringing a glove",
+  });
+
+  // Tournament-weekend availability for two future weekends.
+  for (const offset of [19, 20, 21, 26, 27, 28]) {
+    for (let i = 0; i < playerIds.length; i++) {
+      await db.insert(tables.availabilityDays).values({
+        seasonId: season.id,
+        playerId: playerIds[i],
+        day: isoDay(offset),
+        status: (i + offset) % 4 === 0 ? "no" : (i + offset) % 7 === 0 ? "maybe" : "yes",
+      });
+    }
+  }
+
+  console.log("Seeded demo data.");
+  console.log(`  Coach login:  ${DEMO_COACH.email} / ${DEMO_COACH.password}`);
+  console.log(`  Parent login: ${DEMO_PARENT.email} / ${DEMO_PARENT.password}`);
+}
+
+main().then(() => process.exit(0));
