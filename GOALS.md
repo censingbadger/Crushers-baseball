@@ -10,6 +10,10 @@ app is the **team intelligence layer on top of it**: coach ratings, lineup
 optimization, player development, and parent communication that no
 off-the-shelf scoring app provides.
 
+It also replaces the Google Sheet the team organizes with today — roster and
+contacts, practice RSVPs, tournament availability, helper and snack signups —
+so families have one place to look (goal 10).
+
 ## Who uses it
 
 | Role          | What they can do                                                                                                    |
@@ -24,7 +28,11 @@ Players do not get their own logins (see "Out of scope").
 ### 1. Roster & schedule (the foundation)
 
 - Player profiles: name, jersey number, positions, bats/throws, birth date,
-  parent/guardian contacts, emergency contact, and medical notes.
+  school, up to two parents/guardians (name, email, phone), emergency
+  contact, and medical notes.
+- Roster status per season: full-time or **practice player** — practice
+  players appear in practice RSVPs but sit out tournament planning by
+  default, mirroring how the team runs today.
 - Privacy built in: contact details and medical notes are visible to coaches
   only; parents see the basic roster.
 - Season schedule with three event types: practices, single games, and
@@ -33,6 +41,12 @@ Players do not get their own logins (see "Out of scope").
 - Availability: parents mark their player In / Out / Maybe for each event.
   Coaches see a headcount at a glance and can spot a short-handed game a week
   out instead of at the field.
+- The coach view keeps the familiar grid — players × dates with an
+  auto-computed headcount row, like the Sheet today — but each family edits
+  only its own row.
+- Signups, not just RSVPs: parents volunteer for practice-helper slots
+  ("bring a glove") and for tournament duties like snacks and drinks,
+  per date.
 
 ### 2. Coach ratings & player development
 
@@ -46,6 +60,10 @@ Players do not get their own logins (see "Out of scope").
   season is visible, not just their latest number.
 - Multiple coaches can rate independently; the app shows per-coach ratings
   and the blended view.
+- Per-player **development notes** travel with the ratings — like the
+  pitching "tendency → cue" notes coaches keep in the Sheet today (e.g.
+  "lets arm get in front of body" → "let the arm be pulled by the body").
+  Coach-only by default, shareable per note.
 - **Aspirational goals** live alongside ratings: each player's season goals
   and the positions they want to play. The rating form surfaces these so
   feedback during practices and games ties back to what the player is
@@ -58,6 +76,15 @@ Players do not get their own logins (see "Out of scope").
   rated by coaches. Seeded initially by uploading an Excel file; updated in
   the app over time, with history kept so we can see how position ratings
   evolve.
+- The initial matrix already exists — a 1–10 player × position sheet in the
+  team's Drive folder — so seeding means importing it (Drive or Excel
+  upload), not retyping it.
+- **Weekend innings allocation**, absorbing the coach's current planning
+  spreadsheets: for a tournament weekend (e.g. 4 games × 6 innings = 24
+  innings per player), lay out each player's innings across positions and
+  bench, verify every position sums to full coverage, and plan pitching
+  (innings for the weekend, max per game, which games). Per-game lineups
+  draw down the weekend plan, and actuals feed bench-time tracking.
 - **Strongest-lineup solver**: from the matrix, the app computes the best
   defensive alignment for the players available that day.
 - **Scenario comparison**: pin a decision ("Player A pitches", "Player B
@@ -128,6 +155,10 @@ on their systems), so we do not ask families to score games in a second app.
   actually field a team for.
 - Once we register, the tournament goes on the schedule and normal RSVP
   takes over.
+- This digitizes the Sheet's tournament-availability tab — same grid
+  families already know, including its "we are NOT attending all of these
+  dates" planning purpose — with totals computed automatically and practice
+  players tracked separately.
 
 ### 8. Built to live year after year
 
@@ -143,6 +174,36 @@ on their systems), so we do not ask families to score games in a second app.
   Crushers teams later) so the whole organization could adopt it.
 - The product surface stays single-team for now — no org admin UI until
   it's needed.
+
+### 10. One-stop shop: absorb and retire the organizing Google Sheet
+
+The team currently organizes in a shared Google Sheet ("Crushers 11u BLUE -
+Summer 2026"). Every one of its features has a home in the app:
+
+| Sheet feature                                              | Where it lands              |
+| ---------------------------------------------------------- | --------------------------- |
+| Roster: numbers, birthdays, school, two guardians' contacts | Goal 1 player profiles      |
+| Practice RSVP grid with headcount totals                    | Goal 1 availability grid    |
+| Parent practice-helper signup                               | Goal 1 signups              |
+| Tournament availability grid, incl. practice players        | Goal 7 planning             |
+| Snack & drink signup per tournament date                    | Goal 1 signups              |
+| Pitching tendency → cue notes                               | Goal 2 development notes    |
+
+- One-time import straight from Google Drive: roster, contacts, and current
+  RSVPs/availability land in the database with zero retyping. Player and
+  family data goes into the app's database only — never into this code
+  repository.
+- Once parity is reached, the Sheet is retired to a read-only archive and
+  the app is the single source of truth.
+
+### 11. Crushers Blue branding
+
+- The app wears the team's identity: logo and team colors on every screen,
+  on the app icon families save to their phones, and on the monthly
+  reports.
+- Logo and colors are provided by the team manager and stored as a theme;
+  because of goal 9, a future Crushers team gets its own look without code
+  changes.
 
 ## Out of scope (for now)
 
@@ -176,6 +237,10 @@ on their systems), so we do not ask families to score games in a second app.
   published in under 10 minutes.
 - A parent can RSVP in two taps, and their availability grid takes under a
   minute to fill for a season.
+- The organizing Google Sheet imports in one sitting with zero retyping,
+  and nothing it did is lost.
+- A four-game weekend's innings allocation balances every position and
+  bench slot automatically.
 - It is impossible to put an ineligible pitcher on the mound without a
   warning.
 
@@ -191,9 +256,14 @@ on their systems), so we do not ask families to score games in a second app.
   free tier). Firebase remains a workable alternative if preferred.
 - **AI reports**: generated server-side via the Claude API, coach-reviewed
   before publish.
-- **Imports**: Excel (.xlsx) upload for the initial ratings matrix; CSV
-  upload for GameChanger exports.
+- **Imports**: one-time Google Drive import of the organizing Sheet and the
+  existing position matrix; Excel (.xlsx) upload as the ongoing path for
+  matrices; CSV upload for GameChanger exports.
+- **Branding**: team logo and colors as a per-team theme (CSS tokens +
+  uploaded logo assets), applied app-wide and to reports and the home-screen
+  icon.
 - **Build order**: (1) foundation — seasons, roster, schedule, auth &
-  roles; (2) ratings + position matrix + lineup solver (the centerpiece);
-  (3) game-day execution + pitch safety; (4) stats import + manual entry;
-  (5) AI reports; (6) availability planning.
+  roles, branding theme, Google Sheet import; (2) ratings + position matrix
+  + weekend allocation + lineup solver (the centerpiece); (3) game-day
+  execution + pitch safety; (4) stats import + manual entry; (5) AI
+  reports; (6) availability planning & signups.
