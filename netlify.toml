@@ -1,5 +1,11 @@
 [build]
   command = "npm run build"
 
+# The app runs its drizzle migrations at boot, so the SQL files must ship
+# inside the serverless function bundle — without this every database
+# startup crashes with ENOENT on the live site.
+[functions]
+  included_files = ["drizzle/**"]
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
