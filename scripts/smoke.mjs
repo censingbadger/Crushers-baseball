@@ -56,6 +56,28 @@ await page.goto(BASE + "/import");
 const importText = await page.textContent("main");
 if (!importText?.includes("Roster tab")) fail("import page incomplete");
 
+// Position matrix: blended view renders, per-coach tab is editable.
+await page.goto(BASE + "/matrix");
+const matrixText = await page.textContent("main");
+if (!matrixText?.includes("Blended")) fail("matrix page incomplete");
+if (!matrixText?.includes("Coach AB")) fail("matrix missing seeded coach tab");
+await page.screenshot({ path: `${SHOTS}/06-matrix.png`, fullPage: true });
+await page.goto(BASE + "/matrix?rater=AB");
+const firstInput = page.locator("input[name='pos_P']").first();
+await firstInput.fill("9");
+await page.locator("table form button", { hasText: "Save" }).first().click();
+await page.waitForTimeout(800);
+await page.goto(BASE + "/matrix?rater=AB");
+const savedVal = await page.locator("input[name='pos_P']").first().inputValue();
+if (savedVal !== "9") fail(`matrix rating did not save (got "${savedVal}")`);
+
+// Player edit page loads for the coach.
+await page.goto(BASE + "/roster");
+await page.click("tbody a[href^='/roster/']");
+await page.waitForURL("**/roster/**");
+const editText = await page.textContent("main");
+if (!editText?.includes("Careful zone")) fail("player edit page incomplete");
+
 // Log out, log in as parent, RSVP for own player on the next practice.
 await page.click("header form button");
 await page.waitForURL("**/login");

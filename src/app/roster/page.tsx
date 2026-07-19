@@ -45,12 +45,24 @@ export default async function RosterPage() {
                   {p.jerseyNumber ?? "—"}
                 </td>
                 <td className="py-1.5 pr-2 font-semibold">
-                  {p.firstName} {p.lastName}
+                  {isCoach ? (
+                    <Link className="underline-offset-2 hover:underline" href={`/roster/${p.playerId}`}>
+                      {p.firstName} {p.lastName}
+                    </Link>
+                  ) : (
+                    <>
+                      {p.firstName} {p.lastName}
+                    </>
+                  )}
                 </td>
                 <td className="py-1.5 pr-2">
                   {p.status === "practice" ? (
                     <span className="rounded border border-ink bg-team-blue-light px-1.5 py-0.5 text-xs font-bold">
                       Practice
+                    </span>
+                  ) : p.status === "hopeful" ? (
+                    <span className="rounded border border-ink bg-amber-300 px-1.5 py-0.5 text-xs font-bold">
+                      Hopeful
                     </span>
                   ) : (
                     <span className="rounded border border-ink bg-team-orange px-1.5 py-0.5 text-xs font-bold text-paper">

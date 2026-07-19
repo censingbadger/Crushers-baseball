@@ -7,10 +7,12 @@ export function ImportForm({
   title,
   description,
   action,
+  accept = ".csv,text/csv",
 }: {
   title: string;
   description: string;
   action: (prev: ImportResult | null, formData: FormData) => Promise<ImportResult>;
+  accept?: string;
 }) {
   const [result, formAction, pending] = useActionState(action, null);
 
@@ -23,7 +25,7 @@ export function ImportForm({
           className="field max-w-xs text-xs"
           type="file"
           name="file"
-          accept=".csv,text/csv"
+          accept={accept}
           required
         />
         <button className="btn btn-primary text-sm" type="submit" disabled={pending}>

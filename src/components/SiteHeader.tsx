@@ -1,15 +1,18 @@
+import Image from "next/image";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { logout } from "@/app/auth-actions";
 
 function LogoMark() {
   return (
-    <span
-      aria-hidden
-      className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-ink bg-paper text-lg"
-    >
-      ⚾
-    </span>
+    <Image
+      src="/logo.png"
+      alt="Crushers logo"
+      width={40}
+      height={36}
+      priority
+      className="h-9 w-auto"
+    />
   );
 }
 
@@ -37,9 +40,14 @@ export async function SiteHeader() {
                 Availability
               </Link>
               {user.role === "coach" && (
-                <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/import">
-                  Import
-                </Link>
+                <>
+                  <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/matrix">
+                    Matrix
+                  </Link>
+                  <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/import">
+                    Import
+                  </Link>
+                </>
               )}
             </nav>
             <div className="ml-auto flex items-center gap-2 text-sm">

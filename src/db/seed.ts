@@ -16,7 +16,7 @@ const PLAYERS: {
   last: string;
   jersey: number | null;
   positions: string;
-  status: "full" | "practice";
+  status: "full" | "practice" | "hopeful";
 }[] = [
   { first: "Milo", last: "Vance", jersey: 2, positions: "P, SS", status: "full" },
   { first: "Theo", last: "Ramos", jersey: 5, positions: "C, 1B", status: "full" },
@@ -29,7 +29,10 @@ const PLAYERS: {
   { first: "Nate", last: "Sherman", jersey: 24, positions: "C, 2B", status: "full" },
   { first: "Cole", last: "Bryant", jersey: 33, positions: "P, LF", status: "full" },
   { first: "Ryder", last: "Quinn", jersey: null, positions: "OF", status: "practice" },
+  { first: "Sky", last: "Nolan", jersey: null, positions: "2B", status: "hopeful" },
 ];
+
+const POSITIONS = ["P", "C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"] as const;
 
 function at(daysFromNow: number, hour: number, minute = 0): Date {
   const d = new Date();
@@ -155,12 +158,12 @@ async function main() {
   });
 
   // A believable spread of RSVPs for the next practice.
-  const answers = ["yes", "yes", "yes", "no", "maybe", "yes", "yes", "no", "yes", "yes", "maybe"] as const;
+  const answers = ["yes", "yes", "yes", "no", "maybe", "yes", "yes", "no", "yes", "yes", "maybe", "yes"] as const;
   for (let i = 0; i < playerIds.length; i++) {
     await db.insert(tables.rsvps).values({
       eventId: practice1.id,
       playerId: playerIds[i],
-      status: answers[i],
+      status: answers[i % answers.length],
     });
     await db.insert(tables.rsvps).values({
       eventId: pastPractice.id,
@@ -175,6 +178,21 @@ async function main() {
     guardianName: "Perry Vance",
     note: "bringing a glove",
   });
+
+  // Two demo coaches' position ratings so the matrix has life.
+  for (const [raterIdx, rater] of ["AB", "CD"].entries()) {
+    for (let i = 0; i < playerIds.length; i++) {
+      for (let j = 0; j < POSITIONS.length; j++) {
+        await db.insert(tables.positionRatings).values({
+          seasonId: season.id,
+          playerId: playerIds[i],
+          position: POSITIONS[j],
+          rating: ((i * 3 + j * 5 + raterIdx) % 9) + 1,
+          rater,
+        });
+      }
+    }
+  }
 
   // Tournament-weekend availability for two future weekends.
   for (const offset of [19, 20, 21, 26, 27, 28]) {

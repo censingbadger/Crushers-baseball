@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb, tables } from "@/db";
-import type { RsvpStatus } from "@/db/schema";
+import type { RosterStatus, RsvpStatus } from "@/db/schema";
 
 export async function getActiveSeason() {
   const db = await getDb();
@@ -23,7 +23,7 @@ export interface RosterPlayer {
   firstName: string;
   lastName: string;
   jerseyNumber: number | null;
-  status: "full" | "practice";
+  status: RosterStatus;
   positions: string | null;
   school: string | null;
   birthdate: string | null;

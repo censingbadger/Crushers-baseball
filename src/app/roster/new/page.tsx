@@ -48,6 +48,7 @@ export default async function NewPlayerPage({
             <select className="field" id="status" name="status" defaultValue="full">
               <option value="full">Full-time</option>
               <option value="practice">Practice player</option>
+              <option value="hopeful">Hopeful</option>
             </select>
           </div>
           <div>

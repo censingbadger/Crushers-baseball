@@ -3,16 +3,16 @@
 /*
  * Crushers Blue theme (goal 11).
  * Columbia blue primary, orange + white accents, black borders.
- * Exact shades get matched to the team logo once provided; these are the
- * documented placeholders.
+ * Orange (#F47F0C) and near-black (#1E1B1B) are sampled from the team's
+ * "OC" logo (public/logo.png).
  */
 @theme {
   --color-team-blue: #9bcbeb;
   --color-team-blue-light: #d9ebf7;
   --color-team-blue-dark: #5b91b8;
-  --color-team-orange: #f97316;
-  --color-team-orange-dark: #c2410c;
-  --color-ink: #0a0a0a;
+  --color-team-orange: #f47f0c;
+  --color-team-orange-dark: #c05e06;
+  --color-ink: #1e1b1b;
   --color-paper: #ffffff;
   --color-paper-tint: #f4f9fd;
   --font-sans:

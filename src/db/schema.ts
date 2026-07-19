@@ -14,10 +14,15 @@ import {
 // Postgres (prod).
 export type UserRole = "coach" | "parent";
 export type SeasonTerm = "spring" | "summer" | "fall";
-export type RosterStatus = "full" | "practice";
+// full = regular roster; practice = practices only (never in game lineups);
+// hopeful = prospective player being evaluated.
+export type RosterStatus = "full" | "practice" | "hopeful";
 export type EventType = "practice" | "game" | "tournament";
 export type RsvpStatus = "yes" | "no" | "maybe";
 export type SignupKind = "helper" | "snacks" | "drinks";
+
+export const POSITIONS = ["P", "C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"] as const;
+export type Position = (typeof POSITIONS)[number];
 
 export const teams = pgTable("teams", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -162,6 +167,25 @@ export const signups = pgTable("signups", {
   guardianName: text("guardian_name").notNull(),
   createdByUserId: uuid("created_by_user_id").references(() => users.id),
   note: text("note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Player-by-position skill ratings (goal 3's matrix). Append-only: the
+// current matrix is the latest row per (season, player, position, rater),
+// and older rows are the history. `rater` is a coach label (e.g. "MC"),
+// mirroring the per-coach sheets of the original Excel workbook.
+export const positionRatings = pgTable("position_ratings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  seasonId: uuid("season_id")
+    .notNull()
+    .references(() => seasons.id),
+  playerId: uuid("player_id")
+    .notNull()
+    .references(() => players.id),
+  position: text("position").$type<Position>().notNull(),
+  rating: integer("rating").notNull(),
+  rater: text("rater").notNull(),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

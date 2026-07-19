@@ -93,9 +93,9 @@ export default async function EventPage({
                 <tr key={p.playerId} className="border-b border-ink/10">
                   <td className="py-1.5 pr-2 font-semibold">
                     {p.firstName} {p.lastName}
-                    {p.status === "practice" && (
+                    {p.status !== "full" && (
                       <span className="ml-1 text-[10px] font-bold uppercase text-neutral-500">
-                        practice player
+                        {p.status === "practice" ? "practice player" : "hopeful"}
                       </span>
                     )}
                   </td>

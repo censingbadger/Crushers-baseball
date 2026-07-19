@@ -161,17 +161,33 @@ export function parseAvailabilityGridCsv(
   return { columns, players, warnings };
 }
 
-/** Case/whitespace-insensitive "First Last" matcher against roster names. */
+/**
+ * Case/whitespace-insensitive player-name matcher. Accepts "First Last",
+ * "First L" (last-initial, as the matrix workbook uses), and a bare first
+ * name when unambiguous.
+ */
 export function matchPlayerByName(
   name: string,
   roster: { id: string; firstName: string; lastName: string }[],
 ): string | null {
   const target = name.replace(/\s+/g, " ").trim().toLowerCase();
+  if (!target) return null;
   for (const p of roster) {
     const full = `${p.firstName} ${p.lastName}`.replace(/\s+/g, " ").trim().toLowerCase();
     if (full === target) return p.id;
   }
-  // Fall back to first-name-only match when unambiguous.
+  // "First L" — first name plus last-initial (with or without a period).
+  const initialMatch = target.match(/^(.+?) ([a-z])\.?$/);
+  if (initialMatch) {
+    const [, first, initial] = initialMatch;
+    const hits = roster.filter(
+      (p) =>
+        p.firstName.trim().toLowerCase() === first &&
+        p.lastName.trim().toLowerCase().startsWith(initial),
+    );
+    if (hits.length === 1) return hits[0].id;
+  }
+  // Bare first name when unambiguous.
   const firstMatches = roster.filter(
     (p) => p.firstName.trim().toLowerCase() === target,
   );
