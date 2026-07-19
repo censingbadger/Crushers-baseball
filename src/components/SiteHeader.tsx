@@ -44,6 +44,9 @@ export async function SiteHeader() {
                   <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/matrix">
                     Matrix
                   </Link>
+                  <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/lineup">
+                    Lineup
+                  </Link>
                   <Link className="rounded px-2 py-1 hover:bg-team-blue-light" href="/import">
                     Import
                   </Link>

@@ -71,6 +71,13 @@ await page.goto(BASE + "/matrix?rater=AB");
 const savedVal = await page.locator("input[name='pos_P']").first().inputValue();
 if (savedVal !== "9") fail(`matrix rating did not save (got "${savedVal}")`);
 
+// Lineup lab: solver renders a full field from the seeded matrix.
+await page.goto(BASE + "/lineup");
+const lineupText = await page.textContent("main");
+if (!lineupText?.includes("Strongest lineup")) fail("lineup page did not solve");
+if (lineupText?.includes("unfilled")) fail("lineup left positions unfilled with a full pool");
+await page.screenshot({ path: `${SHOTS}/07-lineup.png`, fullPage: true });
+
 // Player edit page loads for the coach.
 await page.goto(BASE + "/roster");
 await page.click("tbody a[href^='/roster/']");
