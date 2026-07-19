@@ -174,6 +174,30 @@ const refilled = await page.textContent("main");
 if (refilled?.includes("P is empty")) fail("cascade suggestion did not fill P");
 await page.screenshot({ path: `${SHOTS}/10-dugout.png`, fullPage: true });
 
+// Stats: create a manual box score, enter a line, verify derived rates.
+await page.goto(BASE + "/stats");
+await page.fill("#label", "Smoke Scrimmage");
+await page.fill("#gameDate", "2026-07-18");
+await page.click("button:has-text('Create & enter stats')");
+await page.waitForURL("**/stats/game/**");
+const statRow = page.locator("tr", { hasText: "Milo Vance" }).first();
+const statPid = await page.locator("input[name='playerId']").first().inputValue();
+await page.fill(`input[name='ab_${statPid}']`, "3");
+await page.fill(`input[name='h_${statPid}']`, "2");
+await page.fill(`input[name='hr_${statPid}']`, "1");
+await page.fill(`input[name='ip_${statPid}']`, "2.1");
+await page.fill(`input[name='er_${statPid}']`, "1");
+await page.fill(`input[name='pk_${statPid}']`, "4");
+await page.locator("button:has-text('Save all')").first().click();
+await page.waitForURL("**saved=1**");
+await page.goto(BASE + "/stats");
+const statsText = await page.textContent("main");
+if (!statsText?.includes(".667")) fail("batting AVG not derived (expected .667)");
+if (!statsText?.includes("2.1")) fail("pitching IP missing");
+if (!statsText?.includes("2.57")) fail(`ERA not derived (expected 2.57)`);
+await page.screenshot({ path: `${SHOTS}/12-stats.png`, fullPage: true });
+void statRow;
+
 // Coach progress view shows the trend.
 await page.goto(BASE + "/progress");
 const coachProgress = await page.textContent("main");

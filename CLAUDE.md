@@ -20,4 +20,7 @@
   logo.
 - **Verify**: `npm test`, `npm run build`, and `node scripts/smoke.mjs`
   against a seeded `npm run dev` server (uses `/opt/pw-browsers/chromium`
-  via `CHROMIUM_PATH` in this environment).
+  via `CHROMIUM_PATH` in this environment). If `.data/pglite` holds real
+  team data, never wipe `.data/` — seed and run the smoke against a demo
+  dir instead: `PGLITE_DATA_DIR=.data/demo-pglite` for both seed and dev
+  (smoke expects a fresh demo seed).
