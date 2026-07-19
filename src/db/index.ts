@@ -35,7 +35,14 @@ async function createDb(): Promise<Db> {
   const migrationsFolder = path.join(process.cwd(), "drizzle");
 
   if (url) {
-    if (process.env.DB_HTTP === "1") {
+    // Neon-backed hosts (Netlify DB included) speak SQL over HTTPS, which
+    // is the dependable path from serverless functions and restricted
+    // networks alike — raw TCP 5432 from a function cold start is not.
+    const preferHttp =
+      process.env.DB_HTTP === "1" ||
+      Boolean(process.env.NETLIFY) ||
+      /\.db\.netlify\.com|\.neon\.tech/.test(url);
+    if (preferHttp) {
       const client = neon(url);
       const db = drizzleNeonHttp(client, { schema });
       await migrateNeonHttp(db, { migrationsFolder });
