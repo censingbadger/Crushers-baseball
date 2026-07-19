@@ -25,13 +25,13 @@ export default async function SchedulePage() {
       {list.map((e) => {
         const counts = headcount(rsvps.get(e.id));
         return (
-          <li key={e.id} className="flex flex-wrap items-center gap-2 py-2">
+          <li key={e.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2">
             <span className="w-24 shrink-0 rounded border border-ink bg-team-blue-light px-1.5 py-0.5 text-center text-xs font-bold">
               {EVENT_TYPE_LABEL[e.type]}
             </span>
             <Link
               href={`/schedule/${e.id}`}
-              className="min-w-0 flex-1 font-semibold underline-offset-2 hover:underline"
+              className="min-w-0 flex-1 basis-52 font-semibold underline-offset-2 hover:underline"
             >
               {e.title ?? EVENT_TYPE_LABEL[e.type]}
               <span className="ml-2 font-normal text-neutral-600">
@@ -40,7 +40,7 @@ export default async function SchedulePage() {
                 {e.opponent ? ` · vs ${e.opponent}` : ""}
               </span>
             </Link>
-            <span className="text-xs font-semibold">
+            <span className="ml-auto shrink-0 whitespace-nowrap text-xs font-semibold">
               <span className="text-green-700">{counts.yes} in</span>
               {" · "}
               <span className="text-red-700">{counts.no} out</span>

@@ -196,7 +196,7 @@ export default async function StatsPage() {
                 <span className={`rounded border-2 border-ink px-1.5 py-0.5 text-xs font-bold uppercase ${g.source === "gc" ? "bg-team-blue-light" : "bg-team-orange text-paper"}`}>
                   {g.source === "gc" ? "GC" : "Manual"}
                 </span>
-                <Link href={`/stats/game/${g.id}`} className="flex-1 font-semibold underline-offset-2 hover:underline">
+                <Link href={`/stats/game/${g.id}`} className="min-w-0 flex-1 basis-52 font-semibold underline-offset-2 hover:underline">
                   {g.label}
                   {g.opponent && <span className="text-neutral-600"> vs {g.opponent}</span>}
                   <span className="ml-2 text-xs text-neutral-500">{formatIsoDay(g.gameDate)}</span>
