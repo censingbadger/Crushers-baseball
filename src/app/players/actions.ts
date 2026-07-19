@@ -37,7 +37,9 @@ async function guard(playerId: string) {
   return user;
 }
 
-export async function savePlayerPage(formData: FormData): Promise<void> {
+export async function savePlayerPage(
+  formData: FormData,
+): Promise<{ ok: boolean; error?: string }> {
   const parsed = pageSchema.safeParse({
     playerId: formData.get("playerId"),
     skin: formData.get("skin"),
@@ -51,18 +53,22 @@ export async function savePlayerPage(formData: FormData): Promise<void> {
     font: formData.get("font"),
     wallpaper: formData.get("wallpaper"),
   });
-  if (!parsed.success) return;
+  if (!parsed.success) return { ok: false, error: "Something looked off — try again." };
   const user = await guard(parsed.data.playerId);
-  if (!user) return;
+  if (!user) return { ok: false, error: "You can only edit your own player's page." };
 
-  // Optional photo upload — small images only, stored inline as a data URI.
+  // Optional photo — the browser resizes and re-encodes it to a small JPEG
+  // data URI before submitting, so any phone photo (HEIC included) works.
   let photoDataUrl: string | null | undefined = undefined;
-  const photo = formData.get("photo");
-  if (photo instanceof File && photo.size > 0) {
-    if (photo.size > 700_000) return; // keep rows small; UI states the limit
-    if (!/^image\/(png|jpeg|webp)$/.test(photo.type)) return;
-    const buf = Buffer.from(await photo.arrayBuffer());
-    photoDataUrl = `data:${photo.type};base64,${buf.toString("base64")}`;
+  const photoField = formData.get("photoDataUrl");
+  if (typeof photoField === "string" && photoField.length > 0) {
+    if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(photoField)) {
+      return { ok: false, error: "That photo couldn't be read — try another one." };
+    }
+    if (photoField.length > 1_400_000) {
+      return { ok: false, error: "That photo is too large even after resizing." };
+    }
+    photoDataUrl = photoField;
   }
   if (formData.get("removePhoto") === "1") photoDataUrl = null;
   // A fresh photo switches the page to photo mode; removing it switches
@@ -99,6 +105,7 @@ export async function savePlayerPage(formData: FormData): Promise<void> {
   }
   revalidatePath(`/players/${playerId}`);
   revalidatePath("/players");
+  return { ok: true };
 }
 
 const segmentSchema = z.object({

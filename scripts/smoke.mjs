@@ -9,7 +9,7 @@
  * Env: BASE_URL (default http://localhost:3000), CHROMIUM_PATH,
  * SHOTS_DIR (default .data/screenshots).
  */
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { chromium } from "playwright";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
@@ -365,6 +365,31 @@ if (!playerPageText?.includes("Quick glove to the dirt")) {
   fail("player page missing shared focus cue");
 }
 if (!playerPageText?.includes("My teammates")) fail("player page missing teammates");
+
+// Customize: pick a look, attach a photo (browser-resized), save, verify
+// the visible confirmation and the applied border.
+await page.click("summary:has-text('Make it yours')");
+await page.click("button[aria-label='Bubblegum']");
+await page.click("button[aria-label='Green monster']");
+const photoPath = `${SHOTS}/fixture-photo.png`;
+writeFileSync(
+  photoPath,
+  Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  ),
+);
+await page.setInputFiles("#photo", photoPath);
+await page.locator("text=Photo ready").waitFor({ timeout: 10000 });
+await page.click("button:has-text('Save my page')");
+await page.locator("[data-testid=save-status]").waitFor({ timeout: 15000 });
+const saveStatus = await page.textContent("[data-testid=save-status]");
+if (!saveStatus?.includes("Saved")) fail(`player page save failed: ${saveStatus}`);
+await page.waitForTimeout(800);
+const heroStyle = await page.locator("section").first().getAttribute("style");
+if (!heroStyle?.includes("29, 122, 70")) {
+  fail(`customized border not applied (got ${heroStyle})`);
+}
 await page.screenshot({ path: `${SHOTS}/14-playerpage.png`, fullPage: true });
 
 // Parent taps Milo's first tournament-day cell; it cycles and persists.
