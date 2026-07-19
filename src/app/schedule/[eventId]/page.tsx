@@ -139,7 +139,20 @@ export default async function EventPage({
       </section>
 
       <section className="card p-4">
-        <h2 className="mb-2 text-lg font-bold">Signups</h2>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-bold">Signups</h2>
+          {signupKinds.map((k) => {
+            const covered = signups.some((s) => s.kind === k);
+            return (
+              <span
+                key={k}
+                className={`chip ${covered ? "bg-green-600 text-white" : "bg-amber-400"}`}
+              >
+                {SIGNUP_LABEL[k]?.split(" (")[0] ?? k}: {covered ? "covered" : "still open"}
+              </span>
+            );
+          })}
+        </div>
         {signups.length > 0 && (
           <ul className="mb-3 space-y-1 text-sm">
             {signups.map((s) => (

@@ -488,7 +488,10 @@ export const reports = pgTable(
 
 // Family availability for potential tournament weekends (goal 7). Distinct
 // from event RSVPs: these are "could we play that day" answers used to pick
-// which tournaments to enter.
+// which tournaments to enter. "unknown" is a candidate day the coach added
+// that the family hasn't answered yet.
+export type AvailabilityStatus = RsvpStatus | "unknown";
+
 export const availabilityDays = pgTable(
   "availability_days",
   {
@@ -500,7 +503,7 @@ export const availabilityDays = pgTable(
       .notNull()
       .references(() => players.id),
     day: date("day").notNull(),
-    status: text("status").$type<RsvpStatus>().notNull(),
+    status: text("status").$type<AvailabilityStatus>().notNull(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("availability_once").on(t.seasonId, t.playerId, t.day)],
