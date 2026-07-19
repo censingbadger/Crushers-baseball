@@ -21,6 +21,7 @@ const COACH: NavItem[] = [
   { href: "/lineup", label: "Lineup" },
   { href: "/weekend", label: "Weekend" },
   { href: "/drills", label: "Drills" },
+  { href: "/families", label: "Admin" },
   { href: "/import", label: "Import" },
 ];
 
