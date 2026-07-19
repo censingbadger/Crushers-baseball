@@ -20,7 +20,9 @@ function isoDateOf(d: Date): string {
 }
 
 const createSchema = z.object({
-  eventId: z.string().uuid(),
+  // Empty string = "quick game": we create a schedule event on the fly so
+  // the dugout works even when no game is on the calendar yet.
+  eventId: z.string().uuid().or(z.literal("")),
   label: z.string().trim().min(1).max(60),
   opponent: z.string().trim().max(80).optional(),
   innings: z.coerce.number().int().min(1).max(9),
@@ -29,15 +31,35 @@ const createSchema = z.object({
 export async function createGame(formData: FormData): Promise<void> {
   await requireCoach();
   const parsed = createSchema.safeParse({
-    eventId: formData.get("eventId"),
+    eventId: formData.get("eventId") ?? "",
     label: formData.get("label"),
     opponent: formData.get("opponent") || undefined,
     innings: formData.get("innings"),
   });
   if (!parsed.success) redirect("/games?error=1");
-  const { eventId, label, opponent, innings } = parsed.data;
+  const { label, opponent, innings } = parsed.data;
+  let { eventId } = parsed.data;
 
   const db = await getDb();
+  if (eventId === "") {
+    const [season] = await db
+      .select()
+      .from(tables.seasons)
+      .where(eq(tables.seasons.isActive, true))
+      .limit(1);
+    if (!season) redirect("/games?error=1");
+    const [quickEvent] = await db
+      .insert(tables.events)
+      .values({
+        seasonId: season.id,
+        type: "game",
+        title: label,
+        startsAt: new Date(),
+        opponent: opponent || null,
+      })
+      .returning();
+    eventId = quickEvent.id;
+  }
   const [event] = await db
     .select()
     .from(tables.events)
