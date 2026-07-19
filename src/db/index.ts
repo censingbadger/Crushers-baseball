@@ -49,8 +49,15 @@ async function createDb(): Promise<Db> {
     return db as unknown as Db;
   }
 
+  // Serverless filesystems are read-only, so a deploy without a database
+  // URL (e.g. a deploy preview whose context lacks NETLIFY_DATABASE_URL)
+  // gets an ephemeral in-memory database instead of a crash — it boots to
+  // the first-run screen and touches no real data.
+  const serverless = Boolean(
+    process.env.NETLIFY || process.env.LAMBDA_TASK_ROOT || process.env.VERCEL,
+  );
   const dataDir =
-    process.env.PGLITE_DATA_DIR === "memory"
+    process.env.PGLITE_DATA_DIR === "memory" || serverless
       ? undefined
       : (process.env.PGLITE_DATA_DIR ??
         path.join(process.cwd(), ".data", "pglite"));
