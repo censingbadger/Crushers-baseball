@@ -43,9 +43,18 @@ async function createDb(): Promise<Db> {
       Boolean(process.env.NETLIFY) ||
       /\.db\.netlify\.com|\.neon\.tech/.test(url);
     if (preferHttp) {
-      const client = neon(url);
+      // The SQL-over-HTTPS endpoint lives on the direct host, not the
+      // connection pooler — normalize pooled URLs before deriving it.
+      const client = neon(url.replace("-pooler.", "."));
       const db = drizzleNeonHttp(client, { schema });
-      await migrateNeonHttp(db, { migrationsFolder });
+      // The schema is created/updated by migrations at boot; if the files
+      // are unreadable on a hosted bundle, a database that is already
+      // migrated must not take the site down.
+      try {
+        await migrateNeonHttp(db, { migrationsFolder });
+      } catch (err) {
+        console.error("migration check failed (continuing with existing schema):", err);
+      }
       return db as unknown as Db;
     }
     // prepare:false keeps pooled (transaction-mode) URLs happy; max:1 suits
