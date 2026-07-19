@@ -201,6 +201,9 @@ Summer 2026"). Every one of its features has a home in the app:
 - The app wears the team's identity: logo and team colors on every screen,
   on the app icon families save to their phones, and on the monthly
   reports.
+- Team colors: **orange and white, with black borders/outlines**. ("Blue"
+  in Crushers Blue is the squad name, not the palette.) Exact shades get
+  matched to the team logo once it's provided.
 - Logo and colors are provided by the team manager and stored as a theme;
   because of goal 9, a future Crushers team gets its own look without code
   changes.
