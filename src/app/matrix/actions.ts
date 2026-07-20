@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { z } from "zod";
 import { getDb, tables } from "@/db";
@@ -47,6 +47,39 @@ export async function saveMatrixRow(formData: FormData): Promise<void> {
       createdByUserId: user.id,
     });
   }
+  revalidatePath("/matrix");
+}
+
+/**
+ * Delete every rating one rater holds for one player this season — history
+ * included. For rows that were wrong at birth (a departed player's imported
+ * numbers landing on a same-named teammate), superseding isn't enough: the
+ * bogus history would still read as real. The cleared row shows blank until
+ * someone rates the player again.
+ */
+export async function clearMatrixRow(formData: FormData): Promise<void> {
+  await requireCoach();
+  const parsed = saveRowSchema.safeParse({
+    playerId: formData.get("playerId"),
+    rater: formData.get("rater"),
+  });
+  if (!parsed.success) return;
+  const db = await getDb();
+  const [season] = await db
+    .select()
+    .from(tables.seasons)
+    .where(eq(tables.seasons.isActive, true))
+    .limit(1);
+  if (!season) return;
+  await db
+    .delete(tables.positionRatings)
+    .where(
+      and(
+        eq(tables.positionRatings.seasonId, season.id),
+        eq(tables.positionRatings.playerId, parsed.data.playerId),
+        eq(tables.positionRatings.rater, parsed.data.rater),
+      ),
+    );
   revalidatePath("/matrix");
 }
 

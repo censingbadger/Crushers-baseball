@@ -82,6 +82,23 @@ await page.goto(BASE + "/matrix?rater=AB");
 const savedVal = await page.locator("input[name='pos_P']").first().inputValue();
 if (savedVal !== "9") fail(`matrix rating did not save (got "${savedVal}")`);
 
+// Cell-level corrections: rate one player under a throwaway coach "ZZ",
+// then clear the row — tab appears and disappears, seeded data untouched.
+await page.goto(BASE + "/matrix?rater=new");
+await page.locator("input[name='rater']").first().fill("ZZ");
+await page.locator("input[name='pos_C']").first().fill("4");
+await page.locator("table form button", { hasText: "Save" }).first().click();
+await page.waitForTimeout(800);
+await page.goto(BASE + "/matrix?rater=ZZ");
+const zzVal = await page.locator("input[name='pos_C']").first().inputValue();
+if (zzVal !== "4") fail(`new-coach matrix rating did not save (got "${zzVal}")`);
+page.once("dialog", (d) => d.accept());
+await page.locator("table form button", { hasText: "Clear" }).first().click();
+await page.waitForTimeout(800);
+await page.goto(BASE + "/matrix");
+const clearedText = await page.textContent("main");
+if (clearedText?.includes("Coach ZZ")) fail("cleared rater tab still present");
+
 // Lineup lab: solver renders a full field from the seeded matrix.
 await page.goto(BASE + "/lineup");
 const lineupText = await page.textContent("main");
