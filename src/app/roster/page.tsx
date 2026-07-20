@@ -116,11 +116,11 @@ export default async function RosterPage() {
               <th className="py-1 pr-2">Player</th>
               <th className="py-1 pr-2">Status</th>
               <th className="py-1 pr-2">Positions</th>
-              {isCoach && <th className="py-1 pr-2">Rated best at</th>}
               {isCoach && <th className="py-1 pr-2">Season bat / arm</th>}
               {isCoach && <th className="py-1 pr-2">Birthdate</th>}
               {isCoach && <th className="py-1 pr-2">School</th>}
-              {isCoach && <th className="py-1">Parents / guardians</th>}
+              {isCoach && <th className="py-1 pr-2">Parents / guardians</th>}
+              {isCoach && <th className="py-1"></th>}
             </tr>
           </thead>
           <tbody>
@@ -211,22 +211,28 @@ function RosterRow({
                     </span>
                   )}
                 </td>
-                <td className="py-1.5 pr-2">{p.positions ?? "—"}</td>
-                {isCoach && (
-                  <td className="whitespace-nowrap py-1.5 pr-2">
-                    {topPositions(blended).map((t) => (
-                      <span
-                        key={t.position}
-                        className="mr-1 rounded border border-line bg-team-blue-light px-1 py-0.5 text-xs font-bold"
-                      >
-                        {t.position} {t.rating}
-                      </span>
-                    ))}
-                    {topPositions(blended).length === 0 && (
-                      <span className="text-xs text-neutral-500">unrated</span>
-                    )}
-                  </td>
-                )}
+                {/* Coaches see the matrix's verdict — the top three rated
+                    positions — not the sign-up sheet's free text. Parents
+                    keep the self-reported field (ratings are coach-only). */}
+                <td className="whitespace-nowrap py-1.5 pr-2">
+                  {isCoach ? (
+                    <>
+                      {topPositions(blended, 3).map((t) => (
+                        <span
+                          key={t.position}
+                          className="mr-1 rounded border border-line bg-team-blue-light px-1 py-0.5 text-xs font-bold"
+                        >
+                          {t.position} {t.rating}
+                        </span>
+                      ))}
+                      {topPositions(blended, 3).length === 0 && (
+                        <span className="text-xs text-neutral-500">unrated</span>
+                      )}
+                    </>
+                  ) : (
+                    (p.positions ?? "—")
+                  )}
+                </td>
                 {isCoach && (
                   <td className="whitespace-nowrap py-1.5 pr-2 text-xs">
                     {bat?.avg !== null && bat?.avg !== undefined
@@ -244,7 +250,7 @@ function RosterRow({
                 )}
                 {isCoach && <td className="py-1.5 pr-2">{p.school ?? "—"}</td>}
                 {isCoach && (
-                  <td className="py-1.5 text-xs">
+                  <td className="py-1.5 pr-2 text-xs">
                     {guardians.map((g, i) => (
                       <div key={i}>
                         <span className="font-semibold">
@@ -254,6 +260,16 @@ function RosterRow({
                         {g.phone && <> · {g.phone}</>}
                       </div>
                     ))}
+                  </td>
+                )}
+                {isCoach && (
+                  <td className="py-1.5">
+                    <Link
+                      className="btn whitespace-nowrap px-2 py-0.5 text-xs"
+                      href={`/roster/${p.playerId}`}
+                    >
+                      ✎ Edit
+                    </Link>
                   </td>
                 )}
               </tr>

@@ -6,7 +6,13 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, tables } from "@/db";
 import { requireCoach } from "@/lib/auth";
-import { detectGcKind, parseGameChangerCsv, type GcKind } from "@/lib/importers/gamechanger";
+import {
+  detectGcKind,
+  dropZeroLines,
+  parseGameChangerCsv,
+  splitGcCombined,
+  type GcKind,
+} from "@/lib/importers/gamechanger";
 import { parseIpToOuts } from "@/lib/stats";
 import type { ImportResult } from "@/app/import/actions";
 
@@ -162,6 +168,35 @@ export async function importGcAuto(
   let imported = 0;
   for (const file of files) {
     const text = await file.text();
+
+    // The GC website's "Export Stats" is one wide file with every
+    // category side by side — one drop fills all four tables.
+    const combined = splitGcCombined(text);
+    if (combined) {
+      const counts: string[] = [];
+      const fileWarnings = new Set<string>();
+      let wrote = 0;
+      for (const [kind, sectionCsv] of Object.entries(combined) as [GcKind, string][]) {
+        const parsed = parseGameChangerCsv(sectionCsv, kind, roster);
+        for (const w of parsed.warnings) fileWarnings.add(w);
+        const lines = dropZeroLines(parsed.lines);
+        if (lines.length === 0) continue;
+        await writeGcSnapshot(db, season.id, kind, lines);
+        counts.push(`${lines.length} ${kind}`);
+        wrote++;
+      }
+      if (wrote > 0) {
+        summary.push(
+          `${file.name}: combined export — ${counts.join(" · ")} lines imported into "${GC_LABEL}" (re-importing replaces them).`,
+        );
+        imported++;
+      } else {
+        warnings.push(`${file.name}: looked like a combined export but no roster rows matched.`);
+      }
+      warnings.push(...fileWarnings);
+      continue;
+    }
+
     const kind: GcKind | null = detectGcKind(text);
     if (!kind) {
       warnings.push(
