@@ -9,7 +9,8 @@ import {
 } from "@/lib/matrix";
 import { POSITIONS } from "@/db/schema";
 import { ImportForm } from "@/app/import/ImportForm";
-import { importMatrixXlsx, saveMatrixRow } from "./actions";
+import { ConfirmButton } from "@/components/ConfirmButton";
+import { clearMatrixRow, importMatrixXlsx, saveMatrixRow } from "./actions";
 
 function ratingBg(v: number | undefined): string {
   if (v === undefined) return "";
@@ -70,7 +71,7 @@ export default async function MatrixPage({
             className={`rounded border border-line px-3 py-1 ${activeTab === r ? "bg-team-orange text-paper" : "bg-paper hover:bg-team-blue-light"}`}
             href={`/matrix?rater=${encodeURIComponent(r)}`}
           >
-            Coach {r}
+            ✎ Coach {r}
           </Link>
         ))}
         <Link
@@ -80,6 +81,14 @@ export default async function MatrixPage({
           + New coach
         </Link>
       </div>
+
+      {activeTab === "blended" && raters.length > 0 && (
+        <p className="text-sm text-neutral-700">
+          Blended is read-only — it averages each coach&apos;s current
+          numbers. To change a rating, open a ✎ coach tab, type in any
+          cell, and save that row.
+        </p>
+      )}
 
       <section className="card overflow-x-auto p-4">
         <table className="w-full min-w-[560px] border-collapse text-sm">
@@ -117,7 +126,9 @@ export default async function MatrixPage({
                   {POSITIONS.map((pos) => {
                     const v = values?.get(pos);
                     return (
-                      <td key={pos} className="border border-line p-0 text-center">
+                      // Value in the key: uncontrolled inputs only re-read
+                      // defaultValue on remount, e.g. after a row is cleared.
+                      <td key={`${pos}:${v ?? ""}`} className="border border-line p-0 text-center">
                         {editable ? (
                           <input
                             name={`pos_${pos}`}
@@ -146,9 +157,20 @@ export default async function MatrixPage({
                           className={activeTab === "new" ? "field mb-1 w-20 text-xs" : ""}
                           required
                         />
-                        <button className="btn px-2.5 py-1 text-xs" type="submit">
-                          Save
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button className="btn px-2.5 py-1 text-xs" type="submit">
+                            Save
+                          </button>
+                          {activeTab !== "new" && (
+                            <ConfirmButton
+                              formAction={clearMatrixRow}
+                              message={`Delete ALL of coach ${activeRater}'s numbers for ${p.firstName} ${p.lastName}? The row goes blank until they're rated again.`}
+                              className="btn px-2 py-1 text-xs text-red-700"
+                            >
+                              Clear
+                            </ConfirmButton>
+                          )}
+                        </div>
                       </form>
                     </td>
                   )}
