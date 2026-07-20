@@ -175,6 +175,12 @@ if (!fieldText?.includes("Batting order")) fail("dashboard missing batting order
 // All nine positions filled by the solver seed (no dashed empty slots).
 const emptySlots = await page.locator("button:has-text('—')").count();
 if (emptySlots > 0) fail(`dashboard left ${emptySlots} field slots empty`);
+// Batting order generator: applies an order and explains its choices.
+page.once("dialog", (d) => d.accept());
+await page.click("button:has-text('Suggest order')");
+await page.waitForTimeout(1000);
+const orderText = await page.textContent("main");
+if (!orderText?.includes("leadoff")) fail("batting order generator notes missing");
 // Start the game, add pitches for the pitcher, score a run, take an out.
 await page.click("button:has-text('Start game')");
 await page.locator("button:has-text('Final')").waitFor({ timeout: 15000 });
