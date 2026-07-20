@@ -11,7 +11,8 @@ import {
   saveAspirations,
   toggleNoteShared,
 } from "@/app/roster/development-actions";
-import { DIMENSIONS, dimensionTrend } from "@/lib/development";
+import { BARS_DIMENSIONS, NOT_OBSERVED } from "@/lib/bars";
+import { dimensionTrend } from "@/lib/development";
 import { POSITIONS } from "@/db/schema";
 import {
   getBlendedRatingsByPlayer,
@@ -51,20 +52,20 @@ export default async function PlayerEditPage({
   const ratingRows = season
     ? await db
         .select()
-        .from(tables.playerRatings)
+        .from(tables.barsRatings)
         .where(
           and(
-            eq(tables.playerRatings.seasonId, season.id),
-            eq(tables.playerRatings.playerId, playerId),
+            eq(tables.barsRatings.seasonId, season.id),
+            eq(tables.barsRatings.playerId, playerId),
           ),
         )
     : [];
-  const trends = DIMENSIONS.map((dim) => ({
+  const trends = BARS_DIMENSIONS.map((dim) => ({
     dim,
     trend: dimensionTrend(
       ratingRows
-        .filter((r) => r.dimension === dim.key)
-        .map((r) => ({ rating: r.rating, createdAt: r.createdAt })),
+        .filter((r) => r.dimension === dim.key && r.level !== NOT_OBSERVED)
+        .map((r) => ({ rating: r.level, createdAt: r.createdAt })),
     ),
   }));
   const hasRatings = trends.some((t) => t.trend.latest !== null);
