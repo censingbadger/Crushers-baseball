@@ -3,24 +3,36 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { logout } from "@/app/auth-actions";
 import { NavLinks, type NavEntry, type NavItem } from "@/components/NavLinks";
+import { FUTURE_PREVIEW_LINKS, FUTURE_PREVIEW_TITLE } from "@/lib/preview";
+
+// Coach-first mode: the active tool is ratings, lineups, and the dugout;
+// family-facing features sit in the muted "Future preview" group (see
+// src/lib/preview.ts) until the team decides to invite parents in.
 
 const TEAM: NavItem[] = [
   { href: "/schedule", label: "Schedule" },
   { href: "/roster", label: "Roster" },
-  { href: "/players", label: "Players" },
-  { href: "/availability", label: "Availability" },
-];
-
-const PROGRESS: NavItem[] = [
-  { href: "/progress", label: "Progress" },
-  { href: "/stats", label: "Stats" },
 ];
 
 const SETTINGS: NavEntry = { href: "/account", label: "Settings", mobileOnly: true };
 
+const FUTURE: NavEntry = {
+  label: FUTURE_PREVIEW_TITLE,
+  preview: true,
+  items: FUTURE_PREVIEW_LINKS,
+};
+
 const PARENT_ENTRIES: NavEntry[] = [
   { label: "Team", items: TEAM },
-  { label: "Progress", items: PROGRESS },
+  {
+    label: FUTURE_PREVIEW_TITLE,
+    preview: true,
+    items: [
+      { href: "/players", label: "Players" },
+      { href: "/progress", label: "Progress" },
+      { href: "/stats", label: "Stats" },
+    ],
+  },
   SETTINGS,
 ];
 
@@ -28,12 +40,11 @@ const COACH_ENTRIES: NavEntry[] = [
   { label: "Team", items: TEAM },
   { href: "/games", label: "Game day", accent: true },
   {
-    label: "Progress",
+    label: "Performance",
     items: [
-      ...PROGRESS,
       { href: "/rate", label: "Rate" },
       { href: "/matrix", label: "Matrix" },
-      { href: "/reports", label: "Reports" },
+      { href: "/stats", label: "Stats" },
     ],
   },
   {
@@ -51,6 +62,7 @@ const COACH_ENTRIES: NavEntry[] = [
       { href: "/import", label: "Import" },
     ],
   },
+  FUTURE,
   SETTINGS,
 ];
 

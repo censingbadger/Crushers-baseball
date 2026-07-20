@@ -14,6 +14,11 @@
   `serverExternalPackages` in `next.config.ts` (bundling breaks its WASM).
 - **Auth**: coach/parent roles. Anything contact/medical is coach-only —
   enforce in server components/actions, not just UI.
+- **Coach-first mode**: the active tool is ratings/lineups/dugout/stats;
+  family-facing features (availability, players, progress, reports) are
+  parked behind the "Future preview" nav group + amber banners, driven by
+  `src/lib/preview.ts`. Don't delete parked features — they turn back on
+  by editing that file. Parent logins exist but were never distributed.
 - **Types over enums**: text columns typed with `$type<...>()` unions.
 - **Theme**: tokens in `src/app/globals.css` (`--color-team-*`); Columbia
   blue primary, orange accent, black borders. Exact shades pending the team

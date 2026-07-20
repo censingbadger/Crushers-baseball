@@ -19,6 +19,8 @@ export interface NavEntry {
   accent?: boolean;
   mobileOnly?: boolean;
   items?: NavItem[];
+  /** Parked features: rendered muted, with a "not in use yet" note. */
+  preview?: boolean;
 }
 
 export function NavLinks({ entries }: { entries: NavEntry[] }) {
@@ -85,11 +87,22 @@ export function NavLinks({ entries }: { entries: NavEntry[] }) {
           return (
             <div key={entry.label} className="sm:relative">
               {/* Phone: a plain section label; the group's links list below it. */}
-              <span className="mt-1 block px-3 text-[11px] font-extrabold uppercase tracking-wide text-neutral-500 sm:hidden">
+              <span
+                className={`mt-1 block px-3 text-[11px] font-extrabold uppercase tracking-wide sm:hidden ${
+                  entry.preview ? "text-amber-700" : "text-neutral-500"
+                }`}
+              >
                 {entry.label}
+                {entry.preview && (
+                  <span className="ml-1.5 font-bold normal-case text-amber-600">
+                    · not in use yet
+                  </span>
+                )}
               </span>
               <button
-                className={`hidden sm:block ${linkCls(active)}`}
+                className={`hidden sm:block ${linkCls(active)} ${
+                  entry.preview && !active ? "text-neutral-500" : ""
+                }`}
                 aria-expanded={expanded}
                 onClick={() => setOpenGroup(expanded ? null : entry.label)}
               >
@@ -100,6 +113,11 @@ export function NavLinks({ entries }: { entries: NavEntry[] }) {
                   expanded ? "sm:block" : "sm:hidden"
                 }`}
               >
+                {entry.preview && (
+                  <p className="hidden px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-amber-700 sm:block">
+                    Not in use yet
+                  </p>
+                )}
                 {entry.items!.map((item) => (
                   <Link
                     key={item.href}

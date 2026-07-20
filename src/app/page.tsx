@@ -8,12 +8,10 @@ import {
 } from "@/lib/data";
 import {
   eventHeadcount,
-  getActiveDrillCount,
   getLatestStatGame,
   getLiveGame,
   getRaterCount,
   getRecentPitchDays,
-  getReportMonthProgress,
   getUnratedPlayers,
   pickNextEvent,
   restingPitchers,
@@ -68,8 +66,9 @@ export default async function HomePage() {
     getRoster(season.id),
   ]);
   const next = pickNextEvent(events, now);
-  const rsvps = next ? await getRsvpsForEvents([next.id]) : new Map();
   const isCoach = user.role === "coach";
+  // RSVP data only feeds the (parked) parent hero — skip it for coaches.
+  const rsvps = next && !isCoach ? await getRsvpsForEvents([next.id]) : new Map();
 
   // Parents triage only their own kids; coaches triage the whole roster.
   const myPlayerIds = isCoach ? null : new Set(await editablePlayerIds(user));
@@ -109,7 +108,10 @@ export default async function HomePage() {
               {formatEventDate(next.startsAt)} · {formatEventTime(next.startsAt, next.endsAt)}
               {next.location ? ` · ${next.location}` : ""}
             </p>
-            {counts && myRoster.length > 0 && (
+            {/* RSVP tallies are family-app territory — GameChanger carries
+                attendance while parents aren't in here, so coaches don't
+                see counts that would always read "no answer". */}
+            {counts && myRoster.length > 0 && !isCoach && (
               <p className="mt-2 text-sm font-semibold">
                 <span className="text-green-700">{counts.yes} in</span>
                 {" · "}
@@ -175,7 +177,7 @@ export default async function HomePage() {
         )}
       </section>
 
-      {isCoach ? <CoachPanels seasonId={season.id} roster={roster} next={next} counts={counts} now={now} /> : (
+      {isCoach ? <CoachPanels seasonId={season.id} roster={roster} events={events} now={now} /> : (
         <ParentPanels myRoster={myRoster} />
       )}
     </div>
@@ -185,27 +187,22 @@ export default async function HomePage() {
 async function CoachPanels({
   seasonId,
   roster,
-  next,
-  counts,
+  events,
   now,
 }: {
   seasonId: string;
   roster: Awaited<ReturnType<typeof getRoster>>;
-  next: { id: string; startsAt: Date } | null;
-  counts: ReturnType<typeof eventHeadcount> | null;
+  events: Awaited<ReturnType<typeof getSeasonEvents>>;
   now: Date;
 }) {
   const today = isoDay(now);
-  const month = today.slice(0, 7);
-  const [liveGame, pitchDays, unrated, reportProgress, latestStats, raterCount, drillCount] =
+  const [liveGame, pitchDays, unrated, latestStats, raterCount] =
     await Promise.all([
       getLiveGame(seasonId),
       getRecentPitchDays(seasonId, addDaysIso(today, -6)),
       getUnratedPlayers(seasonId, roster),
-      getReportMonthProgress(seasonId, month),
       getLatestStatGame(seasonId),
       getRaterCount(seasonId),
-      getActiveDrillCount(),
     ]);
 
   const nameOf = new Map(roster.map((p) => [p.playerId, `${p.firstName} ${p.lastName.charAt(0)}.`]));
@@ -217,15 +214,6 @@ async function CoachPanels({
       label: "Live",
       text: `${liveGame.label}${liveGame.opponent ? ` vs ${liveGame.opponent}` : ""} is in progress — back to the dugout.`,
       href: `/game/${liveGame.id}`,
-    });
-  }
-  if (next && counts && counts.unanswered > 0) {
-    const names =
-      counts.unanswered <= 3 ? ` (${counts.unansweredNames.join(", ")})` : "";
-    attention.push({
-      label: "RSVP",
-      text: `${counts.unanswered} ${counts.unanswered === 1 ? "family hasn't" : "families haven't"} answered for ${formatEventDate(next.startsAt)}${names}.`,
-      href: `/schedule/${next.id}`,
     });
   }
   for (const r of resting) {
@@ -249,13 +237,10 @@ async function CoachPanels({
       href: "/matrix",
     });
   }
-  if (reportProgress.started < roster.length) {
-    attention.push({
-      label: "Reports",
-      text: `Monthly reports: ${reportProgress.started} of ${roster.length} started (${reportProgress.published} published).`,
-      href: "/reports",
-    });
-  }
+  const nextTournament = pickNextEvent(
+    events.filter((e) => e.type === "tournament"),
+    now,
+  );
 
   const tiles = [
     {
@@ -276,9 +261,11 @@ async function CoachPanels({
       line: "Build a field from the current matrix",
     },
     {
-      href: "/drills",
-      title: "Drills",
-      line: `${drillCount} active in the library`,
+      href: "/weekend",
+      title: "Weekend",
+      line: nextTournament
+        ? `Next: ${formatEventDate(nextTournament.startsAt)}`
+        : "No tournament on the calendar",
     },
   ];
 
