@@ -248,6 +248,27 @@ if (!statsText?.includes("2.57")) fail(`ERA not derived (expected 2.57)`);
 await page.screenshot({ path: `${SHOTS}/12-stats.png`, fullPage: true });
 void statRow;
 
+// GameChanger portal: drop batting + pitching CSVs together; the server
+// sniffs which is which and imports both as the replaceable GC snapshot.
+const gcBatting = [
+  "Last,First,AB,R,H,2B,3B,HR,RBI,BB,K,SB",
+  "Vance,Milo,6,2,3,1,0,1,4,1,2,1",
+  "Brooks,Eli,5,1,1,0,0,0,0,2,1,0",
+].join("\n");
+const gcPitching = ["Last,First,IP,BF,ER,BB,K,H", "Castillo,Leo,4.2,20,2,3,7,4"].join("\n");
+await page.locator("[data-testid=gc-portal] input[type=file]").setInputFiles([
+  { name: "batting.csv", mimeType: "text/csv", buffer: Buffer.from(gcBatting) },
+  { name: "pitching.csv", mimeType: "text/csv", buffer: Buffer.from(gcPitching) },
+]);
+await page.locator("[data-testid=gc-result]").waitFor({ timeout: 20000 });
+const gcResult = await page.textContent("[data-testid=gc-result]");
+if (!gcResult?.includes("batting.csv") || !gcResult?.match(/2 batting lines/))
+  fail(`gc portal batting import off: ${gcResult}`);
+if (!gcResult?.match(/1 pitching lines/)) fail("gc portal pitching import off");
+const statsAfterGc = await page.textContent("main");
+if (!statsAfterGc?.includes(".500")) fail("GC batting not in tables (Milo 3-for-6 → .500)");
+if (!statsAfterGc?.includes("4.2")) fail("GC pitching not in tables (Leo 4.2 IP)");
+
 // Coach progress view shows the trend.
 await page.goto(BASE + "/progress");
 const coachProgress = await page.textContent("main");

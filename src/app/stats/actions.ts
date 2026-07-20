@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, tables } from "@/db";
 import { requireCoach } from "@/lib/auth";
-import { parseGameChangerCsv, type GcKind } from "@/lib/importers/gamechanger";
+import { detectGcKind, parseGameChangerCsv, type GcKind } from "@/lib/importers/gamechanger";
 import { parseIpToOuts } from "@/lib/stats";
 import type { ImportResult } from "@/app/import/actions";
 
@@ -27,44 +27,28 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-async function importGc(
-  kind: GcKind,
-  formData: FormData,
-): Promise<ImportResult> {
-  await requireCoach();
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, summary: [], warnings: ["Choose a CSV file first."] };
-  }
-  const { db, season } = await activeSeason();
-  if (!season) {
-    return { ok: false, summary: [], warnings: ["No active season."] };
-  }
-  const roster = await db
-    .select({
-      id: tables.players.id,
-      firstName: tables.players.firstName,
-      lastName: tables.players.lastName,
-    })
-    .from(tables.players);
-  const { lines, warnings } = parseGameChangerCsv(await file.text(), kind, roster);
-  if (lines.length === 0) {
-    return { ok: false, summary: [], warnings };
-  }
+type GcLines = ReturnType<typeof parseGameChangerCsv>["lines"];
 
+/** Write one kind's season snapshot: replaceable, one GC stat game. */
+async function writeGcSnapshot(
+  db: Awaited<ReturnType<typeof getDb>>,
+  seasonId: string,
+  kind: GcKind,
+  lines: GcLines,
+): Promise<string> {
   // One replaceable snapshot game holds the GC season totals.
   let [gcGame] = await db
     .select()
     .from(tables.statGames)
     .where(
-      and(eq(tables.statGames.seasonId, season.id), eq(tables.statGames.source, "gc")),
+      and(eq(tables.statGames.seasonId, seasonId), eq(tables.statGames.source, "gc")),
     )
     .limit(1);
   if (!gcGame) {
     [gcGame] = await db
       .insert(tables.statGames)
       .values({
-        seasonId: season.id,
+        seasonId,
         source: "gc",
         label: GC_LABEL,
         gameDate: todayIso(),
@@ -114,28 +98,62 @@ async function importGc(
     }
   }
 
-  revalidatePath("/stats");
-  return {
-    ok: true,
-    summary: [
-      `${lines.length} ${kind} lines imported into "${GC_LABEL}" (re-importing replaces them).`,
-    ],
-    warnings,
-  };
+  return `${lines.length} ${kind} lines imported into "${GC_LABEL}" (re-importing replaces them).`;
 }
 
-export async function importGcBatting(
+/**
+ * The drop-zone portal: any mix of GameChanger CSVs at once. Each file is
+ * parsed both ways and lands as whichever kind actually matches its
+ * headers — the coach never has to know which export is which.
+ */
+export async function importGcAuto(
   _prev: ImportResult | null,
   formData: FormData,
 ): Promise<ImportResult> {
-  return importGc("batting", formData);
-}
+  await requireCoach();
+  const files = formData
+    .getAll("files")
+    .filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length === 0) {
+    return { ok: false, summary: [], warnings: ["Drop at least one GameChanger CSV."] };
+  }
+  const { db, season } = await activeSeason();
+  if (!season) {
+    return { ok: false, summary: [], warnings: ["No active season."] };
+  }
+  const roster = await db
+    .select({
+      id: tables.players.id,
+      firstName: tables.players.firstName,
+      lastName: tables.players.lastName,
+    })
+    .from(tables.players);
 
-export async function importGcPitching(
-  _prev: ImportResult | null,
-  formData: FormData,
-): Promise<ImportResult> {
-  return importGc("pitching", formData);
+  const summary: string[] = [];
+  const warnings: string[] = [];
+  let imported = 0;
+  for (const file of files) {
+    const text = await file.text();
+    const kind: GcKind | null = detectGcKind(text);
+    if (!kind) {
+      warnings.push(
+        `${file.name}: couldn't tell if this is a batting or pitching export — headers didn't match either.`,
+      );
+      continue;
+    }
+    const parsed = parseGameChangerCsv(text, kind, roster);
+    if (parsed.lines.length === 0) {
+      warnings.push(`${file.name}: recognized as ${kind} but no roster rows matched.`);
+      warnings.push(...parsed.warnings);
+      continue;
+    }
+    const line = await writeGcSnapshot(db, season.id, kind, parsed.lines);
+    summary.push(`${file.name}: ${line}`);
+    warnings.push(...parsed.warnings);
+    imported++;
+  }
+  if (imported > 0) revalidatePath("/stats");
+  return { ok: imported > 0, summary, warnings };
 }
 
 const createGameSchema = z.object({
