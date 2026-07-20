@@ -31,6 +31,15 @@
   the four-needs launcher (Game day / Position matrix / Roster / Stats)
   — no schedule hero or parked-page links for coaches; the event hero
   is parent-only.
+- **Depth chart (`/depth`, `src/lib/depth.ts`)**: the staff's shared
+  "should they play there" roles (primary/secondary/develop/emergency/
+  never) per player×position — one chart, any coach taps, distinct from
+  ability ratings. Game day suggestions rank on ability × role for the
+  dugout's mode dial (Close game / Up big); never = blocked for
+  suggestions (manual drags always allowed); position leverage applies
+  only in the full-field solver; blank cells are exactly neutral
+  (multiplier 1.0) so an unmarked chart behaves like ability-only.
+  Pitch Smart still zeroes resting arms at P in auto-arrange.
 - **Types over enums**: text columns typed with `$type<...>()` unions.
 - **Theme**: tokens in `src/app/globals.css` (`--color-team-*`); Columbia
   blue primary, orange accent, black borders. Exact shades pending the team

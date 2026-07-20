@@ -96,6 +96,14 @@ export function hungarianMin(cost: number[][]): number[] {
 export function solveLineup(
   pool: LineupCandidate[],
   pins: Partial<Record<Position, string>> = {},
+  /**
+   * Optional decision weights (depth-chart roles × leverage) per
+   * playerId × position. Ranking and assignment run on weights when
+   * given; the reported ratings stay raw ability either way. A weight
+   * of 0 means blocked (never-role or resting arm at P) — the solver
+   * would rather leave the slot open than fill it with a block.
+   */
+  weights?: Record<string, Record<string, number>>,
 ): LineupSolution {
   const warnings: string[] = [];
   const assignments = {} as Record<Position, LineupAssignment | null>;
@@ -131,12 +139,22 @@ export function solveLineup(
   if (openPositions.length > 0 && free.length > 0) {
     // Rows = open positions, cols = free players padded with dummies so the
     // matrix is at least square. Dummy value 0 → positions go unfilled only
-    // when the team is short-handed.
-    const cols = Math.max(free.length, openPositions.length);
+    // when the team is short-handed. In weights mode a blocked cell costs
+    // far more than a dummy, so a hole beats a never-fill.
+    const weightOf = (c: LineupCandidate, pos: Position): number =>
+      weights ? (weights[c.playerId]?.[pos] ?? ratingOf(c, pos)) : ratingOf(c, pos);
+    const base = weights ? 20 : 10;
+    // Weights mode always pads with dummies so a position where every
+    // candidate is blocked can resolve to "open" instead of a forced fill.
+    const cols = weights
+      ? free.length + openPositions.length
+      : Math.max(free.length, openPositions.length);
     const cost = openPositions.map((pos) =>
-      Array.from({ length: cols }, (_, j) =>
-        j < free.length ? 10 - ratingOf(free[j], pos) : 10,
-      ),
+      Array.from({ length: cols }, (_, j) => {
+        if (j >= free.length) return base;
+        const w = weightOf(free[j], pos);
+        return weights && w <= 0 ? 1000 : base - w;
+      }),
     );
     const result = hungarianMin(cost);
     for (let r = 0; r < openPositions.length; r++) {

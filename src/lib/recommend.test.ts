@@ -105,3 +105,54 @@ describe("auditLineup", () => {
     expect(clean.filter((s) => s.kind !== "rest")).toHaveLength(0);
   });
 });
+
+describe("role weights (depth chart)", () => {
+  it("never suggests a blocked player into a gap, whatever their ability", () => {
+    const current = { ...FIELD, a8: BENCH }; // CF empty
+    const ratings = { a8: { CF: 9 }, b1: { CF: 5 } };
+    // a8 is a "never" in CF (weight 0); b1 is unmarked.
+    const weights = { a8: { CF: 0 }, b1: { CF: 5 } };
+    const options = gapFillOptions("CF", current, ratings, weights);
+    expect(options.some((o) => o.primaryId === "a8")).toBe(false);
+    expect(options[0]?.primaryId).toBe("b1");
+    // Displayed numbers stay raw ability.
+    expect(options[0]?.primaryRating).toBe(5);
+  });
+
+  it("ranks a primary-role kid over a higher-ability unmarked kid", () => {
+    const current = { ...FIELD, a8: BENCH };
+    const ratings = { a8: { CF: 8 }, b1: { CF: 7 } };
+    // Compete multipliers: b1 primary (7 × 1.25 = 8.75) beats a8 blank (8).
+    const weights = { a8: { CF: 8 }, b1: { CF: 8.75 } };
+    const [best] = gapFillOptions("CF", current, ratings, weights);
+    expect(best.primaryId).toBe("b1");
+    expect(best.primaryRating).toBe(7);
+  });
+
+  it("audit upgrades rank on weights but report raw ratings", () => {
+    const ratings = { a2: { C: 4 }, b1: { C: 5 } };
+    // Roles make the gap decisive: holder a2 is emergency-only at C
+    // (4 × 0.3 = 1.2), bench b1 is the primary (5 × 1.25 = 6.25).
+    const weights = { a2: { C: 1.2 }, b1: { C: 6.25 } };
+    const upgrades = auditLineup(FIELD, ratings, {}, weights).filter(
+      (s) => s.kind === "upgrade",
+    );
+    expect(upgrades).toHaveLength(1);
+    expect(upgrades[0].moves).toEqual([{ playerId: "b1", target: "C" }]);
+    expect(upgrades[0].detail.aRating).toBe(4);
+    expect(upgrades[0].detail.bRating).toBe(5);
+
+    // Without weights the same ratings are quiet (5 < 4 + 2).
+    const plain = auditLineup(FIELD, ratings).filter((s) => s.kind === "upgrade");
+    expect(plain).toHaveLength(0);
+  });
+
+  it("depth entries carry the staff's role for the chip", () => {
+    const ratings = { a2: { C: 5 }, b1: { C: 8 } };
+    const depth = positionDepth("C", FIELD, ratings, {}, 4, undefined, {
+      b1: { C: "never" },
+    });
+    const b1 = depth.find((d) => d.playerId === "b1");
+    expect(b1?.role).toBe("never");
+  });
+});

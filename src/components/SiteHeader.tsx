@@ -39,6 +39,7 @@ const COACH_ENTRIES: NavEntry[] = [
     label: "Performance",
     items: [
       { href: "/matrix", label: "Position matrix" },
+      { href: "/depth", label: "Depth chart" },
       { href: "/rate", label: "Player feedback" },
       { href: "/stats", label: "Stats" },
     ],

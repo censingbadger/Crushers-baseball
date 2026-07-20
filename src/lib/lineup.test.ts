@@ -96,4 +96,43 @@ describe("solveLineup", () => {
     expect(Object.values(assignments).every(Boolean)).toBe(true);
     expect(total).toBe(9);
   });
+
+  it("with weights, keeps the star out of a never spot even when ability says otherwise", () => {
+    // On raw ability the total is maximized with the star in LF (10 + 8 = 18
+    // beats 9 + 4 = 13). The depth chart says LF is a never for the star —
+    // the weighted solve sends them to SS instead.
+    const pool = [
+      candidate("star", { SS: 9, LF: 10 }),
+      candidate("kid", { SS: 8, LF: 4 }),
+    ];
+    const ability = solveLineup(pool);
+    expect(ability.assignments.LF?.playerId).toBe("star");
+
+    const weights = {
+      star: { SS: 9, LF: 0 }, // never in left
+      kid: { SS: 8, LF: 4 },
+    };
+    const roled = solveLineup(pool, {}, weights);
+    expect(roled.assignments.SS?.playerId).toBe("star");
+    expect(roled.assignments.LF?.playerId).toBe("kid");
+    // Reported ratings stay raw ability.
+    expect(roled.assignments.SS?.rating).toBe(9);
+  });
+
+  it("with weights, prefers an open slot over a blocked fill", () => {
+    // Both players are blocked at C (weight 0): the solver leaves C open
+    // rather than forcing one of them behind the plate.
+    const pool = [
+      candidate("a", { C: 9, P: 5 }),
+      candidate("b", { C: 8, "1B": 5 }),
+    ];
+    const weights = {
+      a: { C: 0, P: 5 },
+      b: { C: 0, "1B": 5 },
+    };
+    const { assignments } = solveLineup(pool, {}, weights);
+    expect(assignments.C).toBeNull();
+    expect(assignments.P?.playerId).toBe("a");
+    expect(assignments["1B"]?.playerId).toBe("b");
+  });
 });

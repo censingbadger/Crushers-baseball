@@ -46,9 +46,14 @@ export default async function MatrixPage() {
             entered player by player.
           </p>
         </div>
-        <Link className="btn btn-primary px-5 py-2" href="/matrix/quick">
-          ✎ Rate players (as Coach {rater})
-        </Link>
+        <span className="flex flex-wrap items-center gap-2">
+          <Link className="btn btn-primary px-5 py-2" href="/matrix/quick">
+            ✎ Rate players (as Coach {rater})
+          </Link>
+          <Link className="btn px-4 py-2" href="/depth">
+            Depth chart
+          </Link>
+        </span>
       </div>
 
       <section className="card overflow-x-auto p-4">

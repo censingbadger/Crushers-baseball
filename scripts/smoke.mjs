@@ -107,6 +107,33 @@ const clearedCls = await page
   .getAttribute("class");
 if (clearedCls?.includes("bg-team-orange")) fail("clear my row did not clear");
 
+// Depth chart: the role tap-grid. A tap cycles blank → primary and saves;
+// reload proves persistence; five more taps cycle back to blank.
+await page.goto(BASE + "/depth");
+const depthPageText = await page.textContent("main");
+if (!depthPageText?.includes("Depth chart")) fail("depth page incomplete");
+if (!depthPageText?.includes("Never")) fail("depth legend missing");
+const firstCell = page.locator("button[data-cell]").first();
+const cellKey = await firstCell.getAttribute("data-cell");
+await firstCell.click();
+await page.waitForTimeout(800);
+await page.goto(BASE + "/depth");
+const cellAfter = page.locator(`button[data-cell='${cellKey}']`);
+if ((await cellAfter.textContent())?.trim().charAt(0) !== "P") {
+  fail("depth chart tap did not persist as primary");
+}
+for (let i = 0; i < 5; i++) {
+  await cellAfter.click();
+  await page.waitForTimeout(250);
+}
+await page.waitForTimeout(800);
+await page.goto(BASE + "/depth");
+const cellCleared = await page
+  .locator(`button[data-cell='${cellKey}']`)
+  .textContent();
+if (cellCleared?.trim().charAt(0) === "P") fail("depth chart cycle did not clear");
+await page.screenshot({ path: `${SHOTS}/07-depth.png`, fullPage: true });
+
 // /lineup is retired — it forwards to Game day.
 await page.goto(BASE + "/lineup");
 await page.waitForURL("**/games");
@@ -191,6 +218,10 @@ if (!orderText?.includes("leadoff")) fail("batting order generator notes missing
 const stripText = await page.textContent("main");
 if (stripText?.includes("Start game") || stripText?.match(/1\s*–\s*0|Crushers\s*\+1/))
   fail("scorekeeping UI should be gone");
+// Game-context dial (depth chart modes) lives in the coach strip.
+if ((await page.locator("[data-testid='mode-toggle']").count()) !== 1)
+  fail("mode toggle missing from coach view");
+if (!stripText?.includes("Up big")) fail("develop mode button missing");
 await page.click("button:has-text('+5')");
 await page.waitForTimeout(600);
 const liveText = await page.textContent("main");
@@ -209,6 +240,7 @@ await page.waitForTimeout(300);
 const boardText = await page.textContent("main");
 if (boardText?.includes("Coach's assist")) fail("board mode shows suggestions");
 if (boardText?.includes("left today")) fail("board mode shows pitch numbers");
+if (boardText?.includes("Up big")) fail("board mode shows the mode toggle");
 if (!boardText?.includes("Batting order")) fail("board mode missing batting order");
 await page.screenshot({ path: `${SHOTS}/10b-board.png`, fullPage: true });
 await page.click("button:has-text('Coach view')");
@@ -220,6 +252,7 @@ await pitcherBtn.click();
 await page.waitForTimeout(300);
 const depthText = await page.textContent("main");
 if (!depthText?.includes("P depth")) fail("depth chart missing for selected P");
+if (!depthText?.includes("✎ Depth chart")) fail("island missing the depth chart link");
 await page.click("button:has-text('send')");
 await page.waitForTimeout(800);
 const afterMove = await page.textContent("main");
