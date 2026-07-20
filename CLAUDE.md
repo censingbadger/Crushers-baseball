@@ -28,8 +28,10 @@
   player-safe "Dugout board" (diamond + batting order only, no ratings
   or suggestions). Lineup lab merged into Game day (⚡ Auto-arrange;
   /lineup redirects). Matrix editing = quick entry only (per-coach,
-  initials from login); the blended grid is read-only. All roster
-  statuses (practice/hopeful) are game-eligible. The coach homepage is
+  initials from login); the blended grid is read-only. Full + hopeful
+  players are game-eligible by default; the PRACTICE squad is opt-in
+  only (dugout "Not in this game" chips add them; never seeded into
+  lineups or batting orders). The coach homepage is
   the four-needs launcher (Game day / Position matrix / Roster / Stats)
   — no schedule hero or parked-page links for coaches; the event hero
   is parent-only.
@@ -44,8 +46,12 @@
   Pitch Smart still zeroes resting arms at P in auto-arrange. The
   pitching-first game plan (dugout "Pitching plan" panel →
   `planFullGame`) pins a declared arm per inning and solves every
-  inning in one pass with a +0.5/inning-sat bench-fairness boost;
-  batting order is never touched by planning. The
+  inning in one pass with a +0.5/inning bench-fairness boost that
+  credits bench AND pitched innings (relieved arms return to the field,
+  not the pine); batting order is never touched by planning. The plan
+  outranks ⚡ Auto-arrange: `autoArrangeField` re-solves each remaining
+  inning AROUND that inning's already-written pitcher (shared
+  `solveInningsRange` engine), never replacing a planned arm. The
   practice sorter (`/practice`, `src/lib/practice.ts`) splits the
   roster across stations from the same signals (develop spots /
   needs-work primaries / ★ asks / usage), never-cells excluded. The

@@ -249,6 +249,18 @@ if (!fieldText?.includes("Batting order")) fail("dashboard missing batting order
 // All nine positions filled by the solver seed (no dashed empty slots).
 const emptySlots = await page.locator("button:has-text('—')").count();
 if (emptySlots > 0) fail(`dashboard left ${emptySlots} field slots empty`);
+
+// Practice squad is opt-in: Ryder (practice) isn't seeded into the game
+// or its batting order, but one tap adds him — bench every inning, last
+// batting spot — and from there he's a regular.
+const orderBefore = await page.locator("ol").first().textContent();
+if (orderBefore?.includes("Ryder")) fail("practice player seeded into the game by default");
+if ((await page.locator("button:has-text('+ Ryder Q.')").count()) === 0)
+  fail("practice player missing from the add-player chips");
+await page.click("button:has-text('+ Ryder Q.')");
+await page.waitForTimeout(1000);
+const orderAfter = await page.locator("ol").first().textContent();
+if (!orderAfter?.includes("Ryder")) fail("added practice player missing from batting order");
 // Batting order generator: applies an order and explains its choices.
 page.once("dialog", (d) => d.accept());
 await page.click("button:has-text('Suggest order')");
@@ -333,6 +345,22 @@ if (!pChip2?.includes(altFirst)) fail(`inning 2 pitcher should be ${altFirst}, c
 await page.locator("button:has-text('◀')").first().click();
 await page.waitForTimeout(900);
 await page.screenshot({ path: `${SHOTS}/10c-pitch-plan.png`, fullPage: true });
+
+// The plan outranks Auto-arrange: run it from inning 1, and inning 2
+// must still show the declared alt arm — the solver arranges AROUND
+// each inning's planned pitcher, never over him.
+page.once("dialog", (d) => d.accept());
+await page.click("button:has-text('Auto-arrange')");
+await page.waitForTimeout(1800);
+await page.locator("button:has-text('▶')").first().click();
+await page.waitForTimeout(900);
+const pChipAuto = await page.locator("button:has(span:text-is('P'))").first().textContent();
+if (!pChipAuto?.includes(altFirst))
+  fail(`auto-arrange overrode the pitching plan: inning 2 P should be ${altFirst}, chip says: ${pChipAuto}`);
+const autoEmpty = await page.locator("button:has-text('—')").count();
+if (autoEmpty > 0) fail(`auto-arrange left ${autoEmpty} slots empty in inning 2`);
+await page.locator("button:has-text('◀')").first().click();
+await page.waitForTimeout(900);
 
 // Move the pitcher to the bench (tap pitcher, tap bench button).
 const pitcherBtn = page.locator("button:has(span:text-is('P'))").first();
