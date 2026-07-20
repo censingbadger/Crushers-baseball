@@ -287,6 +287,24 @@ if (!boardText?.includes("Batting order")) fail("board mode missing batting orde
 await page.screenshot({ path: `${SHOTS}/10b-board.png`, fullPage: true });
 await page.click("button:has-text('Coach view')");
 await page.waitForTimeout(300);
+
+// The "who's up" marker: starts at batter 1, advances by tap, and the
+// spot lives server-side so every dugout device agrees after reload.
+const upRow1 = await page
+  .locator("li", { has: page.locator("span:text-is('Up')") })
+  .first()
+  .textContent();
+if (!upRow1?.includes("1.")) fail("up-now marker should start at batter 1");
+await page.click("[data-testid=next-batter]");
+await page.waitForTimeout(900);
+await page.reload();
+await page.waitForTimeout(800);
+const upRowAfter = await page
+  .locator("li", { has: page.locator("span:text-is('Up')") })
+  .first()
+  .textContent();
+if (!upRowAfter?.includes("2.")) fail("Next batter did not persist the marker server-side");
+
 // Move the pitcher to the bench (tap pitcher, tap bench button).
 const pitcherBtn = page.locator("button:has(span:text-is('P'))").first();
 await pitcherBtn.click();
