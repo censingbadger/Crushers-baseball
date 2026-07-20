@@ -25,6 +25,12 @@ export default async function GamePage({
     if (r.inning === game.currentInning) current[r.playerId] = r.position;
   }
 
+  // Each inning's planned pitcher — prefills the pitching-plan panel.
+  const pitcherByInning: Record<number, string> = {};
+  for (const r of assignmentRows) {
+    if (r.position === "P") pitcherByInning[r.inning] = r.playerId;
+  }
+
   const benchInningsByPlayer: Record<string, number> = {};
   const pitchInningsByPlayer: Record<string, number> = {};
   const gamePitchesByPlayer: Record<string, number> = {};
@@ -110,6 +116,7 @@ export default async function GamePage({
         rolesByPlayer={rolesByPlayer}
         aspiringByPlayer={aspiringByPlayer}
         seasonSatShareByPlayer={seasonSatShareByPlayer}
+        pitcherByInning={pitcherByInning}
         score={scoreRows.map((s) => ({ inning: s.inning, side: s.side, runs: s.runs }))}
         battingOrder={orderRows.map((o) => ({ playerId: o.playerId, spot: o.spot }))}
       />
