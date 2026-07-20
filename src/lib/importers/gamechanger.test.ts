@@ -83,3 +83,54 @@ describe("detectGcKind", () => {
     expect(detectGcKind("Name,Email,Phone\nSomeone,a@b.c,555")).toBeNull();
   });
 });
+
+describe("detectGcKind — all four exports", () => {
+  it("detects fielding and catching exports", () => {
+    expect(
+      detectGcKind("Last,First,GP,TC,PO,A,E,DP,FPCT\nVance,Milo,10,24,15,7,2,1,.917"),
+    ).toBe("fielding");
+    expect(
+      detectGcKind("Last,First,INN,PB,SB,CS,CS%\nBrooks,Eli,21.2,3,7,4,.364"),
+    ).toBe("catching");
+  });
+
+  it("detects pitching even with INN/ERA-style headers (no IP column)", () => {
+    expect(
+      detectGcKind(
+        "Last,First,GP,INN,H,R,ER,BB,SO,ERA,WHIP\nCastillo,Leo,5,12.1,10,7,5,6,15,2.43,1.30",
+      ),
+    ).toBe("pitching");
+  });
+
+  it("still refuses a file that matches nothing", () => {
+    expect(detectGcKind("Name,Email\nA,b@c.d")).toBeNull();
+  });
+});
+
+describe("parseGameChangerCsv — fielding & catching", () => {
+  const roster = [
+    { id: "mv", firstName: "Milo", lastName: "Vance" },
+    { id: "eb", firstName: "Eli", lastName: "Brooks" },
+  ];
+
+  it("parses fielding counts", () => {
+    const { lines } = parseGameChangerCsv(
+      "Last,First,TC,PO,A,E,DP\nVance,Milo,24,15,7,2,1",
+      "fielding",
+      roster,
+    );
+    expect(lines).toHaveLength(1);
+    expect(lines[0].stats).toMatchObject({ po: 15, a: 7, e: 2, dp: 1 });
+  });
+
+  it("parses catching with GC innings notation", () => {
+    const { lines } = parseGameChangerCsv(
+      "Last,First,INN,PB,SB,CS\nBrooks,Eli,21.2,3,7,4",
+      "catching",
+      roster,
+    );
+    expect(lines).toHaveLength(1);
+    // 21.2 innings = 21*3 + 2 = 65 outs.
+    expect(lines[0].stats).toMatchObject({ outs: 65, pb: 3, sbAllowed: 7, cs: 4 });
+  });
+});

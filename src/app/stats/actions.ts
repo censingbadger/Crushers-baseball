@@ -78,7 +78,7 @@ async function writeGcSnapshot(
         sf: line.stats.sf ?? 0,
       });
     }
-  } else {
+  } else if (kind === "pitching") {
     await db
       .delete(tables.pitchingLines)
       .where(eq(tables.pitchingLines.statGameId, gcGame.id));
@@ -94,6 +94,34 @@ async function writeGcSnapshot(
         er: line.stats.er ?? 0,
         bb: line.stats.bb ?? 0,
         k: line.stats.k ?? 0,
+      });
+    }
+  } else if (kind === "fielding") {
+    await db
+      .delete(tables.fieldingLines)
+      .where(eq(tables.fieldingLines.statGameId, gcGame.id));
+    for (const line of lines) {
+      await db.insert(tables.fieldingLines).values({
+        statGameId: gcGame.id,
+        playerId: line.playerId!,
+        po: line.stats.po ?? 0,
+        a: line.stats.a ?? 0,
+        e: line.stats.e ?? 0,
+        dp: line.stats.dp ?? 0,
+      });
+    }
+  } else {
+    await db
+      .delete(tables.catchingLines)
+      .where(eq(tables.catchingLines.statGameId, gcGame.id));
+    for (const line of lines) {
+      await db.insert(tables.catchingLines).values({
+        statGameId: gcGame.id,
+        playerId: line.playerId!,
+        outs: line.stats.outs ?? 0,
+        pb: line.stats.pb ?? 0,
+        sbAllowed: line.stats.sbAllowed ?? 0,
+        cs: line.stats.cs ?? 0,
       });
     }
   }

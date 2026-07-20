@@ -5,10 +5,16 @@ import { requireUser } from "@/lib/auth";
 import { getActiveSeason, getRoster } from "@/lib/data";
 import {
   addBatting,
+  addCatching,
+  addFielding,
   addPitching,
   battingRates,
+  catchingRates,
   EMPTY_BATTING,
+  EMPTY_CATCHING,
+  EMPTY_FIELDING,
   EMPTY_PITCHING,
+  fieldingRates,
   formatIp,
   pitchingRates,
 } from "@/lib/stats";
@@ -33,7 +39,7 @@ export default async function StatsPage() {
     .where(eq(tables.statGames.seasonId, season.id))
     .orderBy(asc(tables.statGames.gameDate));
   const gameIds = games.map((g) => g.id);
-  const [battingRows, pitchingRows] = gameIds.length
+  const [battingRows, pitchingRows, fieldingRows, catchingRows] = gameIds.length
     ? await Promise.all([
         db
           .select()
@@ -43,8 +49,16 @@ export default async function StatsPage() {
           .select()
           .from(tables.pitchingLines)
           .where(inArray(tables.pitchingLines.statGameId, gameIds)),
+        db
+          .select()
+          .from(tables.fieldingLines)
+          .where(inArray(tables.fieldingLines.statGameId, gameIds)),
+        db
+          .select()
+          .from(tables.catchingLines)
+          .where(inArray(tables.catchingLines.statGameId, gameIds)),
       ])
-    : [[], []];
+    : [[], [], [], []];
 
   const battingByPlayer = new Map<string, typeof EMPTY_BATTING>();
   for (const row of battingRows) {
@@ -75,6 +89,35 @@ export default async function StatsPage() {
       return { p, totals, rates: pitchingRates(totals) };
     })
     .sort((a, b) => (a.rates.era ?? 99) - (b.rates.era ?? 99));
+
+  const fieldingByPlayer = new Map<string, typeof EMPTY_FIELDING>();
+  for (const row of fieldingRows) {
+    fieldingByPlayer.set(
+      row.playerId,
+      addFielding(fieldingByPlayer.get(row.playerId) ?? EMPTY_FIELDING, row),
+    );
+  }
+  const catchingByPlayer = new Map<string, typeof EMPTY_CATCHING>();
+  for (const row of catchingRows) {
+    catchingByPlayer.set(
+      row.playerId,
+      addCatching(catchingByPlayer.get(row.playerId) ?? EMPTY_CATCHING, row),
+    );
+  }
+  const fielders = roster
+    .filter((p) => fieldingByPlayer.has(p.playerId))
+    .map((p) => {
+      const totals = fieldingByPlayer.get(p.playerId)!;
+      return { p, totals, rates: fieldingRates(totals) };
+    })
+    .sort((a, b) => (b.rates.fpct ?? 0) - (a.rates.fpct ?? 0));
+  const catchers = roster
+    .filter((p) => catchingByPlayer.has(p.playerId))
+    .map((p) => {
+      const totals = catchingByPlayer.get(p.playerId)!;
+      return { p, totals, rates: catchingRates(totals) };
+    })
+    .sort((a, b) => b.totals.outs - a.totals.outs);
   const isCoach = user.role === "coach";
 
   return (
@@ -183,6 +226,68 @@ export default async function StatsPage() {
           </table>
         )}
       </section>
+
+      {fielders.length > 0 && (
+        <section className="card overflow-x-auto p-4">
+          <h2 className="mb-2 text-lg font-bold">Fielding</h2>
+          <table className="w-full min-w-[420px] text-sm" style={{ fontVariantNumeric: "tabular-nums" }}>
+            <thead>
+              <tr className="border-b border-line-strong text-right">
+                <th className="py-1 text-left">Player</th>
+                <th className="px-1.5">TC</th><th className="px-1.5">PO</th>
+                <th className="px-1.5">A</th><th className="px-1.5">E</th>
+                <th className="px-1.5">DP</th>
+                <th className="px-1.5 font-extrabold">FPCT</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fielders.map(({ p, totals, rates }) => (
+                <tr key={p.playerId} className="border-b border-line text-right">
+                  <td className="py-1 text-left font-semibold">
+                    {p.firstName} {p.lastName}
+                  </td>
+                  <td className="px-1.5">{rates.chances}</td>
+                  <td className="px-1.5">{totals.po}</td>
+                  <td className="px-1.5">{totals.a}</td>
+                  <td className="px-1.5">{totals.e}</td>
+                  <td className="px-1.5">{totals.dp}</td>
+                  <td className="px-1.5 font-extrabold text-team-blue-dark">{fmt3(rates.fpct)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {catchers.length > 0 && (
+        <section className="card overflow-x-auto p-4">
+          <h2 className="mb-2 text-lg font-bold">Catching</h2>
+          <table className="w-full min-w-[420px] text-sm" style={{ fontVariantNumeric: "tabular-nums" }}>
+            <thead>
+              <tr className="border-b border-line-strong text-right">
+                <th className="py-1 text-left">Player</th>
+                <th className="px-1.5">INN</th><th className="px-1.5">PB</th>
+                <th className="px-1.5">SB</th><th className="px-1.5">CS</th>
+                <th className="px-1.5 font-extrabold">CS%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {catchers.map(({ p, totals, rates }) => (
+                <tr key={p.playerId} className="border-b border-line text-right">
+                  <td className="py-1 text-left font-semibold">
+                    {p.firstName} {p.lastName}
+                  </td>
+                  <td className="px-1.5">{formatIp(totals.outs)}</td>
+                  <td className="px-1.5">{totals.pb}</td>
+                  <td className="px-1.5">{totals.sbAllowed}</td>
+                  <td className="px-1.5">{totals.cs}</td>
+                  <td className="px-1.5 font-extrabold text-team-blue-dark">{fmt3(rates.csPct)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       <section className="card p-4">
         <h2 className="mb-2 text-lg font-bold">Games</h2>
