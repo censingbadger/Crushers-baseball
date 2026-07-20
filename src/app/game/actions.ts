@@ -87,13 +87,16 @@ export async function createGame(formData: FormData): Promise<void> {
     .limit(1);
   if (!event) redirect("/games?error=1");
 
-  // Seed the lineup from the solver. Everyone on the roster is eligible —
-  // practice and hopeful players included (Mike: "RJ and Ben and Owen
-  // should all be available to be put into any game"); only an explicit
-  // RSVP "no" keeps a player out of the seed.
+  // Seed the lineup from the solver. Full-squad and hopeful players are
+  // in by default; the PRACTICE squad is not (Mike: "Ben and Owen should
+  // not be brought in by default ever") — they stay one tap away via the
+  // dugout's add-player chips for the rare day they suit up. An explicit
+  // RSVP "no" also keeps a player out of the seed.
   const roster = await getRoster(event.seasonId);
   const rsvps = (await getRsvpsForEvents([event.id])).get(event.id);
-  const pool = roster.filter((p) => rsvps?.get(p.playerId) !== "no");
+  const pool = roster.filter(
+    (p) => p.status !== "practice" && rsvps?.get(p.playerId) !== "no",
+  );
   const ratings = await getCurrentRatings(event.seasonId);
   const blended = blendedLookup(ratings);
   const candidates: LineupCandidate[] = pool.map((p) => ({
@@ -240,34 +243,33 @@ export async function setInning(gameId: string, inning: number): Promise<void> {
   revalidatePath(`/game/${gameId}`);
 }
 
-/**
- * The pitching-first game plan: the coach declares who pitches each
- * inning, and the solver arranges the other eight positions around each
- * arm for the WHOLE game in one pass — role/mode weights as usual, plus
- * a bench-fairness boost that grows with innings sat inside this plan so
- * the same kids don't ride the bench all game. The batting order is
- * never touched: it holds for the game (usually the tournament).
- */
-export async function planFullGame(
-  gameId: string,
-  pitchers: (string | null)[],
-  mode: LineupMode = "compete",
-): Promise<{ ok: boolean }> {
-  await requireCoach();
-  const db = await getDb();
-  const [game] = await db
-    .select()
-    .from(tables.liveGames)
-    .where(eq(tables.liveGames.id, gameId))
-    .limit(1);
-  if (!game) return { ok: false };
+// Fairness boost per credited inning, added to every cell of a player
+// who has spent innings off a regular field spot. See solveInningsRange.
+const FAIRNESS = 0.5;
 
-  const assignmentRows = await db
-    .select()
-    .from(tables.gameAssignments)
-    .where(eq(tables.gameAssignments.gameId, gameId));
-  const playerIds = [...new Set(assignmentRows.map((r) => r.playerId))];
-  if (playerIds.length === 0) return { ok: false };
+/**
+ * The per-inning engine behind both the pitching plan and Auto-arrange:
+ * for each inning in [from, to], solve the eight non-pitching positions
+ * around that inning's pinned arm, then write the assignments. Fairness
+ * credit accrues for innings NOT spent at a regular field spot — bench
+ * innings AND pitched innings alike. Without the pitching credit, a
+ * relieved arm competed at zero against boosted sitters and rode the
+ * bench for the rest of the game; with it, he returns to his best
+ * available position and a rested fielder takes the seat instead. Pins
+ * always win (the coach declared that arm, even a resting one — the
+ * picker labels it); where an inning has no pin, Pitch Smart keeps
+ * resting arms off the mound. Bench falls out of the solve.
+ */
+async function solveInningsRange(
+  game: { id: string; seasonId: string; gameDate: string },
+  playerIds: string[],
+  from: number,
+  to: number,
+  pinnedP: (inning: number) => string | null,
+  sat: Record<string, number>,
+  mode: LineupMode,
+): Promise<void> {
+  const db = await getDb();
   const pool = new Set(playerIds);
 
   const roster = await getRoster(game.seasonId);
@@ -293,11 +295,13 @@ export async function planFullGame(
   }
   const roles = rolesByPlayerFrom(await getPositionRoles(game.seasonId));
 
-  const FAIRNESS = 0.5; // per benched inning, added to every cell
-  const sat: Record<string, number> = {};
-  for (const pid of playerIds) sat[pid] = 0;
+  const resting = new Set<string>();
+  for (const pid of playerIds) {
+    const e = pitchEligibility(await pitchHistory(pid), game.gameDate);
+    if (!e.eligible) resting.add(pid);
+  }
 
-  for (let inning = 1; inning <= game.innings; inning++) {
+  for (let inning = from; inning <= to; inning++) {
     const weights = solverWeights(
       playerIds,
       ratingsRecordOf(playerIds, blended),
@@ -305,15 +309,15 @@ export async function planFullGame(
       mode,
       aspiringByPlayer,
     );
+    for (const pid of resting) weights[pid].P = 0;
     for (const pid of playerIds) {
       if (sat[pid] === 0) continue;
       for (const pos of POSITIONS) {
         if (weights[pid][pos] > 0) weights[pid][pos] += FAIRNESS * sat[pid];
       }
     }
-    const declared = pitchers[inning - 1];
-    const pins =
-      declared && pool.has(declared) ? { P: declared } : {};
+    const declared = pinnedP(inning);
+    const pins = declared && pool.has(declared) ? { P: declared } : {};
     const solution = solveLineup(candidates, pins, weights);
 
     const assigned = new Map<string, string>();
@@ -327,17 +331,105 @@ export async function planFullGame(
         .delete(tables.gameAssignments)
         .where(
           and(
-            eq(tables.gameAssignments.gameId, gameId),
+            eq(tables.gameAssignments.gameId, game.id),
             eq(tables.gameAssignments.inning, inning),
             eq(tables.gameAssignments.playerId, pid),
           ),
         );
       await db
         .insert(tables.gameAssignments)
-        .values({ gameId, inning, playerId: pid, position });
-      if (position === BENCH) sat[pid] += 1;
+        .values({ gameId: game.id, inning, playerId: pid, position });
+      if (position === BENCH || position === "P") sat[pid] += 1;
     }
   }
+}
+
+/**
+ * The pitching-first game plan: the coach declares who pitches each
+ * inning, and the solver arranges the other eight positions around each
+ * arm for the WHOLE game in one pass. The batting order is never
+ * touched: it holds for the game (usually the tournament).
+ */
+export async function planFullGame(
+  gameId: string,
+  pitchers: (string | null)[],
+  mode: LineupMode = "compete",
+): Promise<{ ok: boolean }> {
+  await requireCoach();
+  const db = await getDb();
+  const [game] = await db
+    .select()
+    .from(tables.liveGames)
+    .where(eq(tables.liveGames.id, gameId))
+    .limit(1);
+  if (!game) return { ok: false };
+
+  const assignmentRows = await db
+    .select()
+    .from(tables.gameAssignments)
+    .where(eq(tables.gameAssignments.gameId, gameId));
+  const playerIds = [...new Set(assignmentRows.map((r) => r.playerId))];
+  if (playerIds.length === 0) return { ok: false };
+
+  const sat: Record<string, number> = {};
+  for (const pid of playerIds) sat[pid] = 0;
+  await solveInningsRange(
+    game,
+    playerIds,
+    1,
+    game.innings,
+    (inning) => pitchers[inning - 1] ?? null,
+    sat,
+    mode,
+  );
+  revalidatePath(`/game/${gameId}`);
+  return { ok: true };
+}
+
+/**
+ * Bring a roster player into a game the seed left out (practice squad,
+ * or a late arrival after an RSVP "no"): bench rows for every inning
+ * plus the last batting spot — from there he drags like anyone else.
+ */
+export async function addPlayerToGame(
+  gameId: string,
+  playerId: string,
+): Promise<{ ok: boolean }> {
+  await requireCoach();
+  const db = await getDb();
+  const [game] = await db
+    .select()
+    .from(tables.liveGames)
+    .where(eq(tables.liveGames.id, gameId))
+    .limit(1);
+  if (!game) return { ok: false };
+  const roster = await getRoster(game.seasonId);
+  if (!roster.some((p) => p.playerId === playerId)) return { ok: false };
+
+  const existing = await db
+    .select()
+    .from(tables.gameAssignments)
+    .where(
+      and(
+        eq(tables.gameAssignments.gameId, gameId),
+        eq(tables.gameAssignments.playerId, playerId),
+      ),
+    );
+  if (existing.length > 0) return { ok: true }; // already in
+
+  for (let inning = 1; inning <= game.innings; inning++) {
+    await db
+      .insert(tables.gameAssignments)
+      .values({ gameId, inning, playerId, position: BENCH });
+  }
+  const orderRows = await db
+    .select()
+    .from(tables.battingOrders)
+    .where(eq(tables.battingOrders.gameId, gameId));
+  const nextSpot = orderRows.reduce((m, r) => Math.max(m, r.spot), 0) + 1;
+  await db
+    .insert(tables.battingOrders)
+    .values({ gameId, playerId, spot: nextSpot });
   revalidatePath(`/game/${gameId}`);
   return { ok: true };
 }
@@ -561,9 +653,13 @@ export async function swapBattingSpot(
 }
 
 /**
- * The Lineup lab, absorbed: solve the strongest defensive alignment for
- * the players in this game and apply it from the current inning onward.
- * Bench falls out of the solve (extra players sit).
+ * The Lineup lab, absorbed: re-solve the strongest defensive alignment
+ * for every inning from the current one onward. The pitching plan
+ * outranks the solver — an arm already written into an inning stays on
+ * the mound there and the other eight spots arrange around him; only
+ * innings with no planned arm get one picked (best eligible). Innings
+ * already played seed the fairness credit, so early sitters and relieved
+ * arms come off the bench late instead of riding it.
  */
 export async function autoArrangeField(
   gameId: string,
@@ -591,65 +687,29 @@ export async function autoArrangeField(
   ];
   if (playerIds.length === 0) return { ok: false };
 
-  const roster = await getRoster(game.seasonId);
-  const blended = blendedLookup(await getCurrentRatings(game.seasonId));
-  const nameOf = new Map(roster.map((p) => [p.playerId, `${p.firstName} ${p.lastName}`]));
-  const candidates: LineupCandidate[] = playerIds.map((id) => ({
-    playerId: id,
-    name: nameOf.get(id) ?? "?",
-    ratings: blended.get(id) ?? new Map(),
-  }));
-
-  // Depth-chart roles + mode steer the arrangement; the kids' own ★
-  // positions pull only in develop mode (the bonus is mode-gated).
-  const aspRows = await db
-    .select({
-      playerId: tables.aspirations.playerId,
-      desiredPositions: tables.aspirations.desiredPositions,
-    })
-    .from(tables.aspirations)
-    .where(eq(tables.aspirations.seasonId, game.seasonId));
-  const aspiringByPlayer: Record<string, string[]> = {};
-  for (const row of aspRows) {
-    const tokens = aspiringTokens(row.desiredPositions);
-    if (tokens.length > 0) aspiringByPlayer[row.playerId] = tokens;
-  }
-  const weights = solverWeights(
-    playerIds,
-    ratingsRecordOf(playerIds, blended),
-    rolesByPlayerFrom(await getPositionRoles(game.seasonId)),
-    mode,
-    aspiringByPlayer,
-  );
-  // Pitch Smart trumps everything: a resting arm never auto-lands at P.
-  for (const pid of playerIds) {
-    const e = pitchEligibility(await pitchHistory(pid), game.gameDate);
-    if (!e.eligible) weights[pid].P = 0;
-  }
-  const solution = solveLineup(candidates, {}, weights);
-
-  const assigned = new Map<string, string>();
-  for (const pos of POSITIONS) {
-    const a = solution.assignments[pos];
-    if (a) assigned.set(a.playerId, pos);
-  }
-  for (let inning = game.currentInning; inning <= game.innings; inning++) {
-    for (const pid of playerIds) {
-      const position = assigned.get(pid) ?? BENCH;
-      await db
-        .delete(tables.gameAssignments)
-        .where(
-          and(
-            eq(tables.gameAssignments.gameId, gameId),
-            eq(tables.gameAssignments.inning, inning),
-            eq(tables.gameAssignments.playerId, pid),
-          ),
-        );
-      await db
-        .insert(tables.gameAssignments)
-        .values({ gameId, inning, playerId: pid, position });
+  const pitcherByInning: Record<number, string> = {};
+  const sat: Record<string, number> = {};
+  for (const pid of playerIds) sat[pid] = 0;
+  for (const r of assignmentRows) {
+    if (r.position === "P") pitcherByInning[r.inning] = r.playerId;
+    if (
+      r.inning < game.currentInning &&
+      (r.position === BENCH || r.position === "P") &&
+      sat[r.playerId] !== undefined
+    ) {
+      sat[r.playerId] += 1;
     }
   }
+
+  await solveInningsRange(
+    game,
+    playerIds,
+    game.currentInning,
+    game.innings,
+    (inning) => pitcherByInning[inning] ?? null,
+    sat,
+    mode,
+  );
   revalidatePath(`/game/${gameId}`);
   return { ok: true };
 }

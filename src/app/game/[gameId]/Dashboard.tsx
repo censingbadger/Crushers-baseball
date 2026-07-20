@@ -7,6 +7,7 @@ import {
   addPitches,
   applySuggestedBattingOrder,
   autoArrangeField,
+  addPlayerToGame,
   moveGamePlayer,
   planFullGame,
   setInning,
@@ -131,6 +132,8 @@ interface Props {
   seasonSatShareByPlayer: Record<string, number>;
   /** inning -> playerId currently at P, prefilling the pitching plan. */
   pitcherByInning: Record<number, string>;
+  /** Roster kids not in this game (practice squad, RSVP no) — addable. */
+  addablePlayers: { id: string; name: string; practice: boolean }[];
   score: { inning: number; side: "us" | "them"; runs: number }[];
   battingOrder: { playerId: string; spot: number }[];
 }
@@ -459,8 +462,8 @@ export function Dashboard(props: Props) {
               onClick={() => {
                 const ask =
                   mode === "compete"
-                    ? "Auto-arrange the strongest field for this inning onward? Current positions will be rearranged; you can still drag anyone after."
-                    : "Auto-arrange for development? Develop spots and ★ picks get the field; you can still drag anyone after.";
+                    ? "Auto-arrange the strongest field for each inning from here on? Planned pitchers stay on the mound; everyone else is rearranged, and you can still drag anyone after."
+                    : "Auto-arrange for development? Planned pitchers stay on the mound; develop spots and ★ picks get the field. You can still drag anyone after.";
                 if (!window.confirm(ask)) return;
                 startTransition(async () => {
                   await autoArrangeField(game.id, mode);
@@ -653,6 +656,34 @@ export function Dashboard(props: Props) {
                 ? `${nameOf(selected)} selected — tap a position to move, tap again to cancel.`
                 : "Drag a player onto the field (hold a beat on phones), or tap to select."}
             </p>
+            {/* Kids the seed left out — practice squad stays opt-in. */}
+            {!board && props.addablePlayers.length > 0 && (
+              <div className="mt-1.5 border-t border-line pt-1.5">
+                <span className="text-[11px] font-bold uppercase text-neutral-500">
+                  Not in this game
+                </span>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {props.addablePlayers.map((p) => (
+                    <button
+                      key={p.id}
+                      className="rounded-lg border-2 border-dashed border-line-strong px-2 py-1 text-xs font-bold hover:bg-team-blue-light"
+                      disabled={pending}
+                      onClick={() =>
+                        startTransition(async () => {
+                          await addPlayerToGame(game.id, p.id);
+                          router.refresh();
+                        })
+                      }
+                    >
+                      + {p.name}
+                      {p.practice && (
+                        <span className="ml-1 font-semibold text-neutral-500">practice</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* The pitching-first game plan: declare the arms inning by

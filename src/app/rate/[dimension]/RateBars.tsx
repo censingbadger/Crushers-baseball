@@ -135,6 +135,14 @@ export function RateBars({
         )}
       </div>
 
+      {technicalFlag && players.some((p) => p.youngest) && (
+        <p className="text-xs text-neutral-600">
+          🐣 marks the youngest quarter of the roster by birthdate. Technical
+          levels are partly physical maturity — read a young kid&apos;s level
+          with his age in mind before calling it a skill gap.
+        </p>
+      )}
+
       <div className="card divide-y divide-line p-2">
         {players.map((p) => {
           const val = values[p.playerId];

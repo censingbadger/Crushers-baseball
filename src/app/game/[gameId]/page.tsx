@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { eq, inArray } from "drizzle-orm";
 import { getDb, tables } from "@/db";
 import { requireCoach } from "@/lib/auth";
-import { getPositionRoles } from "@/lib/data";
+import { getPositionRoles, getRoster } from "@/lib/data";
 import { aspiringTokens, rolesByPlayerFrom } from "@/lib/depth";
 import { benchInnings } from "@/lib/gameday";
 import { computeSeasonUsage } from "@/lib/usage";
@@ -86,6 +86,17 @@ export default async function GamePage({
   // dugout suggestions rank with.
   const rolesByPlayer = rolesByPlayerFrom(await getPositionRoles(game.seasonId));
 
+  // Roster kids the seed left out (practice squad, RSVP no) — one tap in
+  // the dugout brings any of them in.
+  const inGame = new Set(players.map((p) => p.id));
+  const addablePlayers = (await getRoster(game.seasonId))
+    .filter((p) => !inGame.has(p.playerId))
+    .map((p) => ({
+      id: p.playerId,
+      name: `${p.firstName} ${p.lastName.charAt(0)}.`,
+      practice: p.status === "practice",
+    }));
+
   return (
     <div>
       <h1 className="mb-2 text-xl font-extrabold">
@@ -117,6 +128,7 @@ export default async function GamePage({
         aspiringByPlayer={aspiringByPlayer}
         seasonSatShareByPlayer={seasonSatShareByPlayer}
         pitcherByInning={pitcherByInning}
+        addablePlayers={addablePlayers}
         score={scoreRows.map((s) => ({ inning: s.inning, side: s.side, runs: s.runs }))}
         battingOrder={orderRows.map((o) => ({ playerId: o.playerId, spot: o.spot }))}
       />

@@ -56,13 +56,19 @@ if (homeText?.includes("Next up") || homeText?.includes("Full schedule")) {
 }
 await page.screenshot({ path: `${SHOTS}/02-dashboard.png`, fullPage: true });
 
-// Roster shows coach-only guardian contact info.
+// Roster: expandable card per player. The "everything" panel opens on
+// tap and carries the coach-only guardian contacts + an edit affordance.
 await page.goto(BASE + "/roster");
 const rosterText = await page.textContent("main");
 if (!rosterText?.includes("Perry Vance")) fail("coach roster missing guardian contact");
-// Every row carries an explicit edit affordance for coaches.
-if ((await page.locator("tbody a:has-text('Edit')").count()) === 0)
-  fail("roster rows missing the Edit button");
+if ((await page.locator("main a:has-text('Edit')").count()) === 0)
+  fail("roster cards missing the Edit link");
+await page.locator("[data-testid=expand-everything]").first().click();
+await page.waitForTimeout(300);
+if (!(await page.locator("p:has-text('Parents & guardians')").first().isVisible()))
+  fail("expanded roster card missing the guardians section");
+if (!(await page.locator("main a:has-text('Edit')").first().isVisible()))
+  fail("expanded roster card missing a visible Edit link");
 await page.screenshot({ path: `${SHOTS}/03-roster.png`, fullPage: true });
 
 // Availability grids render, with the weekend planner rollup.
@@ -132,10 +138,10 @@ const cellAfter = page.locator(`button[data-cell='${cellKey}']`);
 if ((await cellAfter.textContent())?.trim().charAt(0) !== "P") {
   fail("depth chart tap did not persist as primary");
 }
-// That primary now leads the roster's Positions column as an orange chip.
+// That primary now leads the roster card's position chips in orange.
 await page.goto(BASE + "/roster");
-if ((await page.locator("tbody span[title^='Primary']").count()) === 0)
-  fail("roster Positions column missing the depth-chart primary chip");
+if ((await page.locator("summary span[title^='Primary']").count()) === 0)
+  fail("roster cards missing the depth-chart primary chip");
 await page.goto(BASE + "/depth");
 for (let i = 0; i < 5; i++) {
   await cellAfter.click();
@@ -186,9 +192,9 @@ const weekendText = await page.textContent("main");
 if (!weekendText?.includes("Position coverage")) fail("weekend balance panel missing");
 await page.screenshot({ path: `${SHOTS}/08-weekend.png`, fullPage: true });
 
-// Player edit page loads for the coach.
+// Player edit page loads for the coach (name in the card header links it).
 await page.goto(BASE + "/roster");
-await page.click("tbody a[href^='/roster/']");
+await page.click("summary a[href^='/roster/']");
 await page.waitForURL("**/roster/**");
 const editText = await page.textContent("main");
 if (!editText?.includes("Careful zone")) fail("player edit page incomplete");
@@ -249,6 +255,18 @@ if (!fieldText?.includes("Batting order")) fail("dashboard missing batting order
 // All nine positions filled by the solver seed (no dashed empty slots).
 const emptySlots = await page.locator("button:has-text('—')").count();
 if (emptySlots > 0) fail(`dashboard left ${emptySlots} field slots empty`);
+
+// Practice squad is opt-in: Ryder (practice) isn't seeded into the game
+// or its batting order, but one tap adds him — bench every inning, last
+// batting spot — and from there he's a regular.
+const orderBefore = await page.locator("ol").first().textContent();
+if (orderBefore?.includes("Ryder")) fail("practice player seeded into the game by default");
+if ((await page.locator("button:has-text('+ Ryder Q.')").count()) === 0)
+  fail("practice player missing from the add-player chips");
+await page.click("button:has-text('+ Ryder Q.')");
+await page.waitForTimeout(1000);
+const orderAfter = await page.locator("ol").first().textContent();
+if (!orderAfter?.includes("Ryder")) fail("added practice player missing from batting order");
 // Batting order generator: applies an order and explains its choices.
 page.once("dialog", (d) => d.accept());
 await page.click("button:has-text('Suggest order')");
@@ -333,6 +351,22 @@ if (!pChip2?.includes(altFirst)) fail(`inning 2 pitcher should be ${altFirst}, c
 await page.locator("button:has-text('◀')").first().click();
 await page.waitForTimeout(900);
 await page.screenshot({ path: `${SHOTS}/10c-pitch-plan.png`, fullPage: true });
+
+// The plan outranks Auto-arrange: run it from inning 1, and inning 2
+// must still show the declared alt arm — the solver arranges AROUND
+// each inning's planned pitcher, never over him.
+page.once("dialog", (d) => d.accept());
+await page.click("button:has-text('Auto-arrange')");
+await page.waitForTimeout(1800);
+await page.locator("button:has-text('▶')").first().click();
+await page.waitForTimeout(900);
+const pChipAuto = await page.locator("button:has(span:text-is('P'))").first().textContent();
+if (!pChipAuto?.includes(altFirst))
+  fail(`auto-arrange overrode the pitching plan: inning 2 P should be ${altFirst}, chip says: ${pChipAuto}`);
+const autoEmpty = await page.locator("button:has-text('—')").count();
+if (autoEmpty > 0) fail(`auto-arrange left ${autoEmpty} slots empty in inning 2`);
+await page.locator("button:has-text('◀')").first().click();
+await page.waitForTimeout(900);
 
 // Move the pitcher to the bench (tap pitcher, tap bench button).
 const pitcherBtn = page.locator("button:has(span:text-is('P'))").first();
