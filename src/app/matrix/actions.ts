@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getDb, tables } from "@/db";
 import { POSITIONS } from "@/db/schema";
 import { requireCoach } from "@/lib/auth";
+import { initialsOf } from "@/lib/format";
 import { insertRatingIfChanged } from "@/lib/matrix";
 import { runMatrixImport } from "@/lib/import-runner";
 import type { MatrixSheet } from "@/lib/importers/matrix";
@@ -48,6 +49,46 @@ export async function saveMatrixRow(formData: FormData): Promise<void> {
     });
   }
   revalidatePath("/matrix");
+}
+
+const cellSchema = z.object({
+  playerId: z.string().uuid(),
+  position: z.enum(POSITIONS),
+  rating: z.number().int().min(1).max(10),
+});
+
+/**
+ * One tap on the quick-entry page. The rater is derived from the signed-in
+ * coach's name (Mike Christian rates as MC) — no tab to pick, no way to
+ * file numbers under someone else's column by accident.
+ */
+export async function saveMatrixCell(
+  playerId: string,
+  position: string,
+  rating: number,
+): Promise<{ ok: boolean; rater: string }> {
+  const user = await requireCoach();
+  const rater = initialsOf(user.displayName);
+  const parsed = cellSchema.safeParse({ playerId, position, rating });
+  if (!parsed.success) return { ok: false, rater };
+  const db = await getDb();
+  const [season] = await db
+    .select()
+    .from(tables.seasons)
+    .where(eq(tables.seasons.isActive, true))
+    .limit(1);
+  if (!season) return { ok: false, rater };
+  await insertRatingIfChanged({
+    seasonId: season.id,
+    playerId: parsed.data.playerId,
+    position: parsed.data.position,
+    rating: parsed.data.rating,
+    rater,
+    createdByUserId: user.id,
+  });
+  revalidatePath("/matrix");
+  revalidatePath("/matrix/quick");
+  return { ok: true, rater };
 }
 
 /**

@@ -35,7 +35,7 @@ export default async function RateIndexPage({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-extrabold">Rate players</h1>
+        <h1 className="text-2xl font-extrabold">Player feedback</h1>
         <p className="mt-1 max-w-2xl text-sm text-neutral-700">
           Tap a player, score the nine dimensions in under a minute, save.
           Every snapshot is kept, so trends build over the season.

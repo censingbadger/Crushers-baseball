@@ -99,6 +99,14 @@ await page.goto(BASE + "/matrix");
 const clearedText = await page.textContent("main");
 if (clearedText?.includes("Coach ZZ")) fail("cleared rater tab still present");
 
+// Quick entry: taps save under the signed-in coach's initials (Coach Demo → CD).
+await page.goto(BASE + "/matrix/quick");
+await page.locator("button[data-pos='P'][data-val='7']").click();
+await page.waitForTimeout(800);
+await page.goto(BASE + "/matrix?rater=CD");
+const cdVal = await page.locator("input[name='pos_P']").first().inputValue();
+if (cdVal !== "7") fail(`quick entry did not save as CD (got "${cdVal}")`);
+
 // Lineup lab: solver renders a full field from the seeded matrix.
 await page.goto(BASE + "/lineup");
 const lineupText = await page.textContent("main");
