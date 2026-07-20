@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   integer,
   pgTable,
   text,
@@ -277,6 +278,32 @@ export const POSITION_ROLES = [
   "never",
 ] as const;
 export type PositionRoleKind = (typeof POSITION_ROLES)[number];
+
+// BARS development ratings (the instrument lives in src/lib/bars.ts):
+// criterion-referenced 1–5 per dimension, level 0 = "not observed"
+// (first-class — never defaulted). Append-only: every row is kept so
+// trends and rater history stay auditable; display uses each rater's
+// latest observed level, medianed across raters. The legacy 1–10
+// player_ratings table remains as history.
+export const barsRatings = pgTable(
+  "bars_ratings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => seasons.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    dimension: text("dimension").$type<import("@/lib/bars").BarsKey>().notNull(),
+    rater: text("rater").notNull(),
+    level: integer("level").notNull(), // 1-5, 0 = not observed
+    day: date("day").notNull(),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("bars_season_dim").on(t.seasonId, t.dimension)],
+);
 
 export const positionRoles = pgTable(
   "position_roles",

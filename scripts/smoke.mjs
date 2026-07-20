@@ -125,6 +125,11 @@ const cellAfter = page.locator(`button[data-cell='${cellKey}']`);
 if ((await cellAfter.textContent())?.trim().charAt(0) !== "P") {
   fail("depth chart tap did not persist as primary");
 }
+// That primary now leads the roster's Positions column as an orange chip.
+await page.goto(BASE + "/roster");
+if ((await page.locator("tbody span[title^='Primary']").count()) === 0)
+  fail("roster Positions column missing the depth-chart primary chip");
+await page.goto(BASE + "/depth");
 for (let i = 0; i < 5; i++) {
   await cellAfter.click();
   await page.waitForTimeout(250);
@@ -181,19 +186,33 @@ await page.waitForURL("**/roster/**");
 const editText = await page.textContent("main");
 if (!editText?.includes("Careful zone")) fail("player edit page incomplete");
 
-// Rate Milo twice to build a trend (second save bumps hitting 4 -> 5).
+// BARS feedback: dimension-first entry with the anchors on screen. Rate
+// Milo's hitting (D1) twice to build a 4 -> 5 trend, and confirm the tap
+// persists across a reload.
 await page.goto(BASE + "/rate");
-await page.click("a:has-text('Milo Vance')");
-await page.waitForURL("**/rate/**");
-await page.click("label:has(input[name='dim_hitting'][value='4'])");
-await page.click("label:has(input[name='dim_dugout'][value='5'])");
-await page.click("button:has-text('Save ratings')");
-await page.waitForURL("**/rate?done=**");
-await page.click("a:has-text('Milo Vance')");
-await page.waitForURL("**/rate/**");
-await page.click("label:has(input[name='dim_hitting'][value='5'])");
-await page.click("button:has-text('Save ratings')");
-await page.waitForURL("**/rate?done=**");
+const rateIndex = await page.textContent("main");
+if (!rateIndex?.includes("Response to failure")) fail("BARS dimension cards missing");
+if (!rateIndex?.includes("Behaviorally anchored")) fail("BARS framing missing");
+if (!rateIndex?.includes("Not observed")) fail("not-observed guidance missing");
+await page.goto(BASE + "/rate/d1");
+const d1Text = await page.textContent("main");
+if (!d1Text?.includes("The standard")) fail("D1 anchors missing the standard marker");
+if (!d1Text?.includes("Works counts")) fail("D1 level-4 anchor text missing");
+const miloRow = page.locator("[data-player-row='Milo Vance']");
+await miloRow.locator("button[data-level='4']").click();
+await page.waitForTimeout(700);
+await miloRow.locator("button[data-level='5']").click();
+await page.waitForTimeout(700);
+await page.goto(BASE + "/rate/d1");
+const lvl5cls = await page
+  .locator("[data-player-row='Milo Vance'] button[data-level='5']")
+  .getAttribute("class");
+if (!lvl5cls?.includes("bg-team-orange")) fail("BARS tap did not persist");
+// Not observed is first-class: mark Eli N/O and make sure it sticks.
+await page
+  .locator("[data-player-row='Eli Brooks'] button[data-level='0']")
+  .click();
+await page.waitForTimeout(700);
 
 // Aspirations and development notes on Milo's player page.
 await page.goto(BASE + "/roster");
@@ -392,6 +411,8 @@ await page.screenshot({ path: `${SHOTS}/09-progress.png`, fullPage: true });
 await page.goto(BASE + "/reports");
 const reportsText = await page.textContent("main");
 if (!reportsText?.includes("Monthly parent reports")) fail("reports page incomplete");
+// Reports live under Performance now — no Future-preview banner here.
+if (reportsText?.includes("not in use yet")) fail("reports still carry the preview banner");
 await page
   .locator("section div", { hasText: "Milo Vance" })
   .locator("button:has-text('Generate draft')")
@@ -400,6 +421,11 @@ await page
 await page.waitForURL("**/reports/**");
 const draftText = await page.inputValue("textarea[name='finalText']");
 if (!draftText.includes("Dear Milo's family,")) fail("report draft missing greeting");
+// The draft carries the BARS data and the scale explanation.
+if (!draftText.includes("How to read our development levels"))
+  fail("report draft missing the BARS explanation");
+if (!draftText.toLowerCase().includes("takes a plan to the plate"))
+  fail("report draft missing the anchor language for Milo's hitting");
 if (!draftText.includes("Major areas that we intend to focus on")) {
   fail("report draft missing letter structure");
 }

@@ -8,7 +8,6 @@ export const FUTURE_PREVIEW_LINKS = [
   { href: "/availability", label: "Availability" },
   { href: "/players", label: "Players" },
   { href: "/progress", label: "Progress" },
-  { href: "/reports", label: "Reports" },
 ];
 
 export const FUTURE_PREVIEW_TITLE = "Future preview";

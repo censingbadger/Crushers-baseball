@@ -16,10 +16,21 @@ const ctx: ReportContext = {
     { position: "SS", rating: 8.5 },
     { position: "2B", rating: 8 },
   ],
-  trends: [
-    { label: "Hitting", latest: 5, direction: "up" },
-    { label: "Effort", latest: 4, direction: "flat" },
-    { label: "Focus on the field", latest: 3, direction: "up" },
+  barsLines: [
+    {
+      code: "D1",
+      label: "Hitting",
+      level: 4,
+      anchorNow: "Works counts.",
+      nextTarget: "Takes a plan to the plate and executes it.",
+    },
+    {
+      code: "D3",
+      label: "Fielding",
+      level: 3,
+      anchorNow: "Consistent ready position and pre-pitch move.",
+      nextTarget: "Range past three steps.",
+    },
   ],
   sharedCues: [
     {
@@ -35,6 +46,9 @@ const ctx: ReportContext = {
   ],
   battingLine: "12-for-30 (.400 AVG, .950 OPS), 10 runs, 8 RBI, 5 walks",
   pitchingLine: "10.2 innings pitched, 14 strikeouts, 2.53 ERA",
+  fieldingLine: "24 chances, 2 errors (.917 fielding pct)",
+  catchingLine: null,
+  playingTimeLine: "6 games, 28 innings in the field (mostly SS, 2B)",
 };
 
 describe("monthLabel", () => {
@@ -73,6 +87,10 @@ describe("templateDraft", () => {
     expect(letter).toContain(".400 AVG");
     expect(letter).toContain("SS");
     expect(letter).toContain("Make the summer all-star team");
+    // The next-level anchor is the named focus, and the scale explanation ships.
+    expect(letter).toContain("Range past three steps.");
+    expect(letter).toContain("How to read our development levels:");
+    expect(letter).toContain("a team full of 3s is a successful 11U team");
   });
 
   it("omits the pitching section without pitching cues", () => {
@@ -89,10 +107,13 @@ describe("templateDraft", () => {
       seasonGoals: null,
       desiredPositions: null,
       topPositions: [],
-      trends: [],
+      barsLines: [],
       sharedCues: [],
       battingLine: null,
       pitchingLine: null,
+      fieldingLine: null,
+      catchingLine: null,
+      playingTimeLine: null,
     });
     expect(bare).toContain("Dear Sky's family,");
     expect(bare).toContain("Major areas");
@@ -106,7 +127,8 @@ describe("buildReportPrompt", () => {
   it("encodes the letter structure and guardrails", () => {
     expect(system).toContain("Major areas that we intend to");
     expect(system).toContain("With gratitude,");
-    expect(system).toContain("Never mention numeric ratings");
+    expect(system).toContain("never rank");
+    expect(system).toContain("How to read our development");
     expect(system).toContain("11-year-old");
   });
 

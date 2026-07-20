@@ -2,7 +2,8 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getDb, tables } from "@/db";
 import { editablePlayerIds, requireUser } from "@/lib/auth";
 import { getActiveSeason, getRoster } from "@/lib/data";
-import { DIMENSIONS, dimensionTrend } from "@/lib/development";
+import { BARS_DIMENSIONS, NOT_OBSERVED } from "@/lib/bars";
+import { dimensionTrend } from "@/lib/development";
 import { monthLabel } from "@/lib/reports";
 
 const TREND_ARROW = { up: "↗", down: "↘", flat: "→" } as const;
@@ -31,11 +32,11 @@ export default async function ProgressPage() {
   const [ratingRows, aspirationRows, noteRows, reportRows] = await Promise.all([
     db
       .select()
-      .from(tables.playerRatings)
+      .from(tables.barsRatings)
       .where(
         and(
-          eq(tables.playerRatings.seasonId, season.id),
-          inArray(tables.playerRatings.playerId, ids),
+          eq(tables.barsRatings.seasonId, season.id),
+          inArray(tables.barsRatings.playerId, ids),
         ),
       ),
     db
@@ -85,12 +86,17 @@ export default async function ProgressPage() {
         const aspiration = aspirationRows.find((a) => a.playerId === p.playerId);
         const cues = noteRows.filter((n) => n.playerId === p.playerId);
         const reports = reportRows.filter((r) => r.playerId === p.playerId);
-        const trends = DIMENSIONS.map((dim) => ({
+        const trends = BARS_DIMENSIONS.map((dim) => ({
           dim,
           trend: dimensionTrend(
             ratingRows
-              .filter((r) => r.playerId === p.playerId && r.dimension === dim.key)
-              .map((r) => ({ rating: r.rating, createdAt: r.createdAt })),
+              .filter(
+                (r) =>
+                  r.playerId === p.playerId &&
+                  r.dimension === dim.key &&
+                  r.level !== NOT_OBSERVED,
+              )
+              .map((r) => ({ rating: r.level, createdAt: r.createdAt })),
           ),
         })).filter((t) => t.trend.latest !== null);
 

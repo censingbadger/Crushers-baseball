@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { getActiveSeason, getGuardiansByPlayer, getRoster } from "@/lib/data";
+import {
+  getActiveSeason,
+  getGuardiansByPlayer,
+  getPositionRoles,
+  getRoster,
+} from "@/lib/data";
+import { rolesByPlayerFrom, type RolesByPlayer } from "@/lib/depth";
 import { formatIsoDay } from "@/lib/format";
 import {
   getBlendedRatingsByPlayer,
@@ -18,7 +24,7 @@ import {
   pitchingRates,
 } from "@/lib/stats";
 import { POSITIONS } from "@/db/schema";
-import { DIMENSIONS, dimensionTrend } from "@/lib/development";
+import { BARS_BY_KEY, barsSummary } from "@/lib/bars";
 import { computeSeasonUsage, type PlayerUsage } from "@/lib/usage";
 import { eq, inArray } from "drizzle-orm";
 import { getDb, tables } from "@/db";
@@ -34,6 +40,11 @@ export default async function RosterPage() {
   const guardians = isCoach
     ? await getGuardiansByPlayer(roster.map((r) => r.playerId))
     : null;
+  // Depth-chart roles drive the Positions column: the staff's call first,
+  // ability as the number inside the chip.
+  const rolesByPlayer: RolesByPlayer = isCoach
+    ? rolesByPlayerFrom(await getPositionRoles(season.id))
+    : {};
   // The one-stop data: coach ratings + all GameChanger stats + feedback.
   const [blended, batting, pitching, fielding, catching, feedbackRows] = isCoach
     ? await Promise.all([
@@ -44,8 +55,8 @@ export default async function RosterPage() {
         getSeasonCatchingByPlayer(season.id),
         (await getDb())
           .select()
-          .from(tables.playerRatings)
-          .where(eq(tables.playerRatings.seasonId, season.id)),
+          .from(tables.barsRatings)
+          .where(eq(tables.barsRatings.seasonId, season.id)),
       ])
     : [null, null, null, null, null, null];
 
@@ -67,33 +78,22 @@ export default async function RosterPage() {
     usage = computeSeasonUsage(liveGames, assignmentRows);
   }
 
-  // Latest feedback score + trend per dimension per player.
+  // BARS development levels: each rater's latest observed level, medianed
+  // across raters, with two-level splits flagged rather than averaged away.
   const feedbackByPlayer = new Map<
     string,
-    { key: string; label: string; latest: number; arrow: string }[]
+    { key: string; label: string; latest: number; arrow: string; flagged: boolean }[]
   >();
   if (feedbackRows) {
-    const byPlayer = new Map<string, typeof feedbackRows>();
-    for (const r of feedbackRows) {
-      byPlayer.set(r.playerId, [...(byPlayer.get(r.playerId) ?? []), r]);
-    }
     const ARROW = { up: "↗", down: "↘", flat: "→" } as const;
-    for (const [pid, rows] of byPlayer) {
-      const dims = DIMENSIONS.map((dim) => {
-        const trend = dimensionTrend(
-          rows
-            .filter((r) => r.dimension === dim.key)
-            .map((r) => ({ rating: r.rating, createdAt: r.createdAt })),
-        );
-        return trend.latest === null
-          ? null
-          : {
-              key: dim.key,
-              label: dim.label,
-              latest: trend.latest,
-              arrow: trend.direction ? ARROW[trend.direction] : "",
-            };
-      }).filter((d): d is NonNullable<typeof d> => d !== null);
+    for (const [pid, cells] of barsSummary(feedbackRows)) {
+      const dims = [...cells.entries()].map(([key, cell]) => ({
+        key,
+        label: `${BARS_BY_KEY[key].code} ${BARS_BY_KEY[key].label}`,
+        latest: cell.median,
+        arrow: cell.direction ? ARROW[cell.direction] : "",
+        flagged: cell.flagged,
+      }));
       if (dims.length > 0) feedbackByPlayer.set(pid, dims);
     }
   }
@@ -130,6 +130,7 @@ export default async function RosterPage() {
                 p={p}
                 isCoach={isCoach}
                 guardians={guardians?.get(p.playerId) ?? []}
+                roles={rolesByPlayer[p.playerId] ?? {}}
                 blended={blended?.get(p.playerId)}
                 batting={batting?.get(p.playerId)}
                 pitching={pitching?.get(p.playerId)}
@@ -155,6 +156,7 @@ function RosterRow({
   p,
   isCoach,
   guardians,
+  roles,
   blended,
   batting,
   pitching,
@@ -166,12 +168,13 @@ function RosterRow({
   p: Awaited<ReturnType<typeof getRoster>>[number];
   isCoach: boolean;
   guardians: { firstName: string; lastName: string; email: string | null; phone: string | null }[];
+  roles: NonNullable<RolesByPlayer[string]>;
   blended: Map<(typeof POSITIONS)[number], number> | undefined;
   batting: Parameters<typeof battingRates>[0] | undefined;
   pitching: Parameters<typeof pitchingRates>[0] | undefined;
   fielding: Parameters<typeof fieldingRates>[0] | undefined;
   catching: Parameters<typeof catchingRates>[0] | undefined;
-  feedback: { key: string; label: string; latest: number; arrow: string }[] | undefined;
+  feedback: { key: string; label: string; latest: number; arrow: string; flagged: boolean }[] | undefined;
   usage: PlayerUsage | undefined;
 }) {
   const bat = batting ? battingRates(batting) : null;
@@ -211,24 +214,13 @@ function RosterRow({
                     </span>
                   )}
                 </td>
-                {/* Coaches see the matrix's verdict — the top three rated
-                    positions — not the sign-up sheet's free text. Parents
-                    keep the self-reported field (ratings are coach-only). */}
+                {/* Coaches see the staff's call — depth-chart primaries and
+                    secondaries with the blended rating inside each chip —
+                    falling back to the top three rated spots until roles are
+                    marked. Parents keep the self-reported field only. */}
                 <td className="whitespace-nowrap py-1.5 pr-2">
                   {isCoach ? (
-                    <>
-                      {topPositions(blended, 3).map((t) => (
-                        <span
-                          key={t.position}
-                          className="mr-1 rounded border border-line bg-team-blue-light px-1 py-0.5 text-xs font-bold"
-                        >
-                          {t.position} {t.rating}
-                        </span>
-                      ))}
-                      {topPositions(blended, 3).length === 0 && (
-                        <span className="text-xs text-neutral-500">unrated</span>
-                      )}
-                    </>
+                    <PositionChips roles={roles} blended={blended} />
                   ) : (
                     (p.positions ?? "—")
                   )}
@@ -307,18 +299,27 @@ function RosterRow({
                       );
                     })}
                   </div>
-                  <p className="mt-2 font-bold uppercase text-neutral-500">Player feedback (latest · trend)</p>
+                  <p className="mt-2 font-bold uppercase text-neutral-500">
+                    Development levels (1–5 · 3 = the 11U standard)
+                  </p>
                   {feedback ? (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {feedback.map((f) => (
-                        <span key={f.key} className="rounded border border-line bg-paper-tint px-1.5 py-0.5 font-semibold">
+                        <span
+                          key={f.key}
+                          title={f.flagged ? "Coaches split by 2+ levels — worth a conversation" : undefined}
+                          className={`rounded border px-1.5 py-0.5 font-semibold ${
+                            f.flagged ? "border-amber-500 bg-amber-50" : "border-line bg-paper-tint"
+                          }`}
+                        >
                           {f.label} {f.latest}
                           {f.arrow}
+                          {f.flagged && " ⚑"}
                         </span>
                       ))}
                     </div>
                   ) : (
-                    <p className="mt-1 text-neutral-500">No feedback scores yet.</p>
+                    <p className="mt-1 text-neutral-500">No development levels yet.</p>
                   )}
                 </div>
                 <div className="space-y-1">
@@ -367,6 +368,68 @@ function RosterRow({
           </td>
         </tr>
       )}
+    </>
+  );
+}
+
+/**
+ * The Positions chips: depth-chart primaries (team orange) then
+ * secondaries (team blue), best-rated first, each carrying the blended
+ * rating — the staff's call and the evidence in one glance. Until roles
+ * are marked, the top three rated spots stand in (neutral chips).
+ */
+function PositionChips({
+  roles,
+  blended,
+}: {
+  roles: NonNullable<RolesByPlayer[string]>;
+  blended: Map<(typeof POSITIONS)[number], number> | undefined;
+}) {
+  const byRating = (a: (typeof POSITIONS)[number], b: (typeof POSITIONS)[number]) =>
+    (blended?.get(b) ?? 0) - (blended?.get(a) ?? 0);
+  const chips = [
+    ...POSITIONS.filter((pos) => roles[pos] === "primary")
+      .sort(byRating)
+      .map((pos) => ({ pos, primary: true })),
+    ...POSITIONS.filter((pos) => roles[pos] === "secondary")
+      .sort(byRating)
+      .map((pos) => ({ pos, primary: false })),
+  ].slice(0, 4);
+
+  if (chips.length > 0) {
+    return (
+      <>
+        {chips.map(({ pos, primary }) => (
+          <span
+            key={pos}
+            title={primary ? "Primary (depth chart)" : "Secondary (depth chart)"}
+            className={`mr-1 rounded border px-1 py-0.5 text-xs font-bold ${
+              primary
+                ? "border-team-orange-dark bg-team-orange text-paper"
+                : "border-team-blue-dark bg-team-blue"
+            }`}
+          >
+            {pos} {blended?.get(pos) ?? "·"}
+          </span>
+        ))}
+      </>
+    );
+  }
+  const top = topPositions(blended, 3);
+  if (top.length === 0) {
+    return <span className="text-xs text-neutral-500">unrated</span>;
+  }
+  return (
+    <>
+      {top.map((t) => (
+        <span
+          key={t.position}
+          title="Top rated (no depth-chart call yet)"
+          className="mr-1 rounded border border-line bg-team-blue-light px-1 py-0.5 text-xs font-bold"
+        >
+          {t.position} {t.rating}
+        </span>
+      ))}
     </>
   );
 }
