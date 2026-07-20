@@ -67,52 +67,39 @@ await page.goto(BASE + "/import");
 const importText = await page.textContent("main");
 if (!importText?.includes("Roster tab")) fail("import page incomplete");
 
-// Position matrix: blended view renders, per-coach tab is editable.
+// Position matrix: blended view is read-only; rating happens in quick entry.
 await page.goto(BASE + "/matrix");
 const matrixText = await page.textContent("main");
-if (!matrixText?.includes("Blended")) fail("matrix page incomplete");
-if (!matrixText?.includes("Coach AB")) fail("matrix missing seeded coach tab");
+if (!matrixText?.includes("Position matrix")) fail("matrix page incomplete");
+if (!matrixText?.includes("Rate players")) fail("matrix missing quick-entry button");
+const gridInputs = await page.locator("main input").count();
+if (gridInputs > 0) fail("blended matrix should have no editable inputs");
 await page.screenshot({ path: `${SHOTS}/06-matrix.png`, fullPage: true });
-await page.goto(BASE + "/matrix?rater=AB");
-const firstInput = page.locator("input[name='pos_P']").first();
-await firstInput.fill("9");
-await page.locator("table form button", { hasText: "Save" }).first().click();
-await page.waitForTimeout(800);
-await page.goto(BASE + "/matrix?rater=AB");
-const savedVal = await page.locator("input[name='pos_P']").first().inputValue();
-if (savedVal !== "9") fail(`matrix rating did not save (got "${savedVal}")`);
 
-// Cell-level corrections: rate one player under a throwaway coach "ZZ",
-// then clear the row — tab appears and disappears, seeded data untouched.
-await page.goto(BASE + "/matrix?rater=new");
-await page.locator("input[name='rater']").first().fill("ZZ");
-await page.locator("input[name='pos_C']").first().fill("4");
-await page.locator("table form button", { hasText: "Save" }).first().click();
-await page.waitForTimeout(800);
-await page.goto(BASE + "/matrix?rater=ZZ");
-const zzVal = await page.locator("input[name='pos_C']").first().inputValue();
-if (zzVal !== "4") fail(`new-coach matrix rating did not save (got "${zzVal}")`);
-page.once("dialog", (d) => d.accept());
-await page.locator("table form button", { hasText: "Clear" }).first().click();
-await page.waitForTimeout(800);
-await page.goto(BASE + "/matrix");
-const clearedText = await page.textContent("main");
-if (clearedText?.includes("Coach ZZ")) fail("cleared rater tab still present");
-
-// Quick entry: taps save under the signed-in coach's initials (Coach Demo → CD).
+// Quick entry: a tap saves under the signed-in coach's initials (Coach
+// Demo → CD) and survives reload; Clear my row empties it again.
 await page.goto(BASE + "/matrix/quick");
 await page.locator("button[data-pos='P'][data-val='7']").click();
 await page.waitForTimeout(800);
-await page.goto(BASE + "/matrix?rater=CD");
-const cdVal = await page.locator("input[name='pos_P']").first().inputValue();
-if (cdVal !== "7") fail(`quick entry did not save as CD (got "${cdVal}")`);
+await page.goto(BASE + "/matrix/quick");
+const tappedCls = await page
+  .locator("button[data-pos='P'][data-val='7']")
+  .first()
+  .getAttribute("class");
+if (!tappedCls?.includes("bg-team-orange")) fail("quick entry tap did not persist");
+page.once("dialog", (d) => d.accept());
+await page.locator("button:has-text('Clear my row')").click();
+await page.waitForTimeout(800);
+await page.goto(BASE + "/matrix/quick");
+const clearedCls = await page
+  .locator("button[data-pos='P'][data-val='7']")
+  .first()
+  .getAttribute("class");
+if (clearedCls?.includes("bg-team-orange")) fail("clear my row did not clear");
 
-// Lineup lab: solver renders a full field from the seeded matrix.
+// /lineup is retired — it forwards to Game day.
 await page.goto(BASE + "/lineup");
-const lineupText = await page.textContent("main");
-if (!lineupText?.includes("Strongest lineup")) fail("lineup page did not solve");
-if (lineupText?.includes("unfilled")) fail("lineup left positions unfilled with a full pool");
-await page.screenshot({ path: `${SHOTS}/07-lineup.png`, fullPage: true });
+await page.waitForURL("**/games");
 
 // Weekend planner: start a plan for the seeded tournament, save a line,
 // verify the balance panel tracks it.
@@ -189,19 +176,33 @@ await page.click("button:has-text('Suggest order')");
 await page.waitForTimeout(1000);
 const orderText = await page.textContent("main");
 if (!orderText?.includes("leadoff")) fail("batting order generator notes missing");
-// Start the game, add pitches for the pitcher, score a run, take an out.
-await page.click("button:has-text('Start game')");
-await page.locator("button:has-text('Final')").waitFor({ timeout: 15000 });
+// No scoring/clock UI — GameChanger records games. The board plans:
+// pitch counting (safety) still works.
+const stripText = await page.textContent("main");
+if (stripText?.includes("Start game") || stripText?.match(/1\s*–\s*0|Crushers\s*\+1/))
+  fail("scorekeeping UI should be gone");
 await page.click("button:has-text('+5')");
-await page.waitForTimeout(600);
-await page.click("button:has-text('+1 Crushers')");
 await page.waitForTimeout(600);
 const liveText = await page.textContent("main");
 if (!liveText?.includes("5 pitches")) fail("pitch count did not update");
-if (!liveText?.includes("1–0") && !liveText?.includes("1–0".normalize())) {
-  const score = await page.textContent("main");
-  if (!score?.match(/1\s*–\s*0/)) fail("score did not update");
-}
+
+// ⚡ Auto-arrange (the Lineup lab, absorbed): field stays fully staffed.
+page.once("dialog", (d) => d.accept());
+await page.click("button:has-text('Auto-arrange')");
+await page.waitForTimeout(1000);
+const afterArrange = await page.locator("button:has-text('—')").count();
+if (afterArrange > 0) fail("auto-arrange left slots empty");
+
+// Dugout board: the player-safe view — no suggestions, no pitch numbers.
+await page.click("button:has-text('Dugout board')");
+await page.waitForTimeout(300);
+const boardText = await page.textContent("main");
+if (boardText?.includes("Coach's assist")) fail("board mode shows suggestions");
+if (boardText?.includes("left today")) fail("board mode shows pitch numbers");
+if (!boardText?.includes("Batting order")) fail("board mode missing batting order");
+await page.screenshot({ path: `${SHOTS}/10b-board.png`, fullPage: true });
+await page.click("button:has-text('Coach view')");
+await page.waitForTimeout(300);
 // Move the pitcher to the bench (tap pitcher, tap bench button).
 const pitcherBtn = page.locator("button:has(span:text-is('P'))").first();
 await pitcherBtn.click();

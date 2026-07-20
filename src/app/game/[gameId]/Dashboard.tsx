@@ -4,13 +4,10 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   addPitches,
-  addRun,
   applySuggestedBattingOrder,
-  cycleOuts,
-  finishGame,
+  autoArrangeField,
   moveGamePlayer,
   setInning,
-  startGame,
   swapBattingSpot,
 } from "@/app/game/actions";
 import { BENCH } from "@/lib/gameday";
@@ -127,32 +124,6 @@ interface Props {
   battingOrder: { playerId: string; spot: number }[];
 }
 
-function Clock({ startedAtMs, clockMinutes }: { startedAtMs: number | null; clockMinutes: number }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  if (!startedAtMs) {
-    return <span className="font-mono text-lg font-bold">{clockMinutes}:00</span>;
-  }
-  const remainingMs = startedAtMs + clockMinutes * 60_000 - now;
-  const negative = remainingMs < 0;
-  const abs = Math.abs(remainingMs);
-  const mm = Math.floor(abs / 60_000);
-  const ss = Math.floor((abs % 60_000) / 1000);
-  return (
-    <span
-      className={`font-mono text-lg font-bold ${
-        negative ? "text-red-700" : remainingMs < 10 * 60_000 ? "text-team-orange-dark" : ""
-      }`}
-    >
-      {negative ? "-" : ""}
-      {mm}:{String(ss).padStart(2, "0")}
-    </span>
-  );
-}
-
 export function Dashboard(props: Props) {
   const { game, players, current, eligibility } = props;
   const router = useRouter();
@@ -160,6 +131,9 @@ export function Dashboard(props: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [warning, setWarning] = useState<{ playerId: string; target: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  // Dugout-board mode: the player-safe view — just the field and the
+  // batting order, no ratings, suggestions, or pitch numbers on display.
+  const [board, setBoard] = useState(false);
   // The slot a move just vacated — the assist island leads with it.
   const [focusGap, setFocusGap] = useState<string | null>(null);
   // The slot a move just filled — the island shows its depth chart.
@@ -357,17 +331,12 @@ export function Dashboard(props: Props) {
   const ghostFor = (slot: string) =>
     gapOptions.get(slot)?.find((o) => o.kind === "bench") ?? null;
 
-  const scoreFor = (inning: number, side: "us" | "them") =>
-    props.score.find((s) => s.inning === inning && s.side === side)?.runs;
-
-  const usTotal = props.score.filter((s) => s.side === "us").reduce((n, s) => n + s.runs, 0);
-  const themTotal = props.score.filter((s) => s.side === "them").reduce((n, s) => n + s.runs, 0);
   const pitcherId = playerAt.get("P") ?? null;
-  const innings = Array.from({ length: Math.max(game.innings, game.currentInning) }, (_, i) => i + 1);
 
   return (
     <div className="space-y-3">
-      {/* Top strip: inning, outs, clock, status */}
+      {/* Top strip: inning stepper + tools. No score, no clock, no outs —
+          GameChanger records the game; this board plans and runs it. */}
       <div className="card flex flex-wrap items-center gap-3 p-3">
         <div className="flex items-center gap-1">
           <button
@@ -391,41 +360,25 @@ export function Dashboard(props: Props) {
             ▶
           </button>
         </div>
-        <button
-          className="btn px-3 py-1.5 font-mono text-lg"
-          title="Tap to add an out"
-          disabled={pending}
-          onClick={() => startTransition(async () => { await cycleOuts(game.id); router.refresh(); })}
-        >
-          {"●".repeat(Math.min(3, game.outs))}
-          {"○".repeat(Math.max(0, 3 - game.outs))}
-        </button>
-        <Clock startedAtMs={game.startedAtMs} clockMinutes={game.clockMinutes} />
         <span className="ml-auto flex items-center gap-2">
-          <span className="text-2xl font-extrabold">
-            {usTotal}<span className="mx-1 text-neutral-400">–</span>{themTotal}
-          </span>
-          {game.status === "setup" && (
+          {!board && (
             <button
-              className="btn btn-primary"
-              onClick={() => startTransition(async () => { await startGame(game.id); router.refresh(); })}
+              className="btn text-sm"
+              disabled={pending || busy}
+              onClick={() => {
+                if (!window.confirm("Auto-arrange the strongest field for this inning onward? Current positions will be rearranged; you can still drag anyone after.")) return;
+                startTransition(async () => {
+                  await autoArrangeField(game.id);
+                  router.refresh();
+                });
+              }}
             >
-              ▶ Start game
+              ⚡ Auto-arrange
             </button>
           )}
-          {game.status === "live" && (
-            <button
-              className="btn"
-              onClick={() => startTransition(async () => { await finishGame(game.id); router.refresh(); })}
-            >
-              Final
-            </button>
-          )}
-          {game.status === "final" && (
-            <span className="rounded border border-line bg-ink px-2 py-0.5 text-xs font-bold uppercase text-paper">
-              Final
-            </span>
-          )}
+          <button className="btn text-sm" onClick={() => setBoard(!board)}>
+            {board ? "← Coach view" : "▦ Dugout board"}
+          </button>
         </span>
       </div>
 
@@ -446,7 +399,7 @@ export function Dashboard(props: Props) {
         </div>
       )}
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
+      <div className={board ? "grid gap-3" : "grid gap-3 lg:grid-cols-[1fr_260px]"}>
         {/* Field */}
         <div>
           <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-line">
@@ -479,18 +432,18 @@ export function Dashboard(props: Props) {
                 >
                   <span className="block text-[11px] font-bold uppercase opacity-70">
                     {pos}
-                    {/* While dragging: the dragged player's fit, everywhere. */}
-                    {drag?.armed && ` · ${ratingChip(drag.pid, pos)}`}
+                    {/* While dragging (coach view): the dragged player's fit. */}
+                    {!board && drag?.armed && ` · ${ratingChip(drag.pid, pos)}`}
                   </span>
-                  <span className="block text-sm font-extrabold leading-tight">
+                  <span className={`block font-extrabold leading-tight ${board ? "text-base" : "text-sm"}`}>
                     {pid ? nameOf(pid) : "—"}
                   </span>
-                  {!pid && !drag?.armed && ghostFor(pos) && (
+                  {!board && !pid && !drag?.armed && ghostFor(pos) && (
                     <span className="block text-[11px] font-semibold italic leading-tight opacity-80">
                       {nameOf(ghostFor(pos)!.primaryId)}?
                     </span>
                   )}
-                  {pos === "P" && pid && (
+                  {pos === "P" && pid && !board && (
                     <span className="block text-[11px] font-semibold">
                       {props.gamePitchesByPlayer[pid] ?? 0} p · {eligibility[pid]?.remaining ?? 0} left
                     </span>
@@ -500,8 +453,8 @@ export function Dashboard(props: Props) {
             })}
           </div>
 
-          {/* Pitch counter for the current pitcher */}
-          {pitcherId && (
+          {/* Pitch counter for the current pitcher (coach view only) */}
+          {pitcherId && !board && (
             <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-paper p-2">
               <span className="text-sm font-bold">
                 ⚾ {nameOf(pitcherId)} — {props.gamePitchesByPlayer[pitcherId] ?? 0} pitches
@@ -562,10 +515,14 @@ export function Dashboard(props: Props) {
                   } ${drag?.armed && drag.pid === pid ? "opacity-40" : ""}`}
                 >
                   {nameOf(pid)}
-                  <span className="ml-1 text-[11px] font-semibold opacity-70">
-                    {props.benchInningsByPlayer[pid] ?? 0} inn sat
-                  </span>
-                  {!eligibility[pid]?.eligible && <span title={eligibility[pid]?.reason ?? ""}> 🚫P</span>}
+                  {!board && (
+                    <span className="ml-1 text-[11px] font-semibold opacity-70">
+                      {props.benchInningsByPlayer[pid] ?? 0} inn sat
+                    </span>
+                  )}
+                  {!board && !eligibility[pid]?.eligible && (
+                    <span title={eligibility[pid]?.reason ?? ""}> 🚫P</span>
+                  )}
                 </button>
               ))}
               {selected && current[selected] !== BENCH && (
@@ -584,7 +541,9 @@ export function Dashboard(props: Props) {
             </p>
           </div>
 
-          {/* The configurator island: gap fills first, then tune-ups. */}
+          {/* The configurator island: gap fills first, then tune-ups.
+              Coach view only — the dugout board stays evaluation-free. */}
+          {!board && (
           <div className="rounded-lg border border-line bg-paper p-2" data-testid="assist">
             <span className="text-xs font-bold uppercase">Coach&apos;s assist</span>
             {depthSlot && depth.length > 0 && (
@@ -667,25 +626,28 @@ export function Dashboard(props: Props) {
               </p>
             )}
           </div>
+          )}
           <div className="rounded-lg border border-line bg-paper p-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase">Batting order</span>
-              <button
-                className="btn px-2 py-0.5 text-xs"
-                disabled={pending || busy}
-                onClick={() => {
-                  if (!window.confirm("Replace the current batting order with a generated one? You can still fine-tune with the arrows.")) return;
-                  startTransition(async () => {
-                    const res = await applySuggestedBattingOrder(game.id);
-                    setOrderNotes(res.notes);
-                    router.refresh();
-                  });
-                }}
-              >
-                ✨ Suggest order
-              </button>
+              {!board && (
+                <button
+                  className="btn px-2 py-0.5 text-xs"
+                  disabled={pending || busy}
+                  onClick={() => {
+                    if (!window.confirm("Replace the current batting order with a generated one? You can still fine-tune with the arrows.")) return;
+                    startTransition(async () => {
+                      const res = await applySuggestedBattingOrder(game.id);
+                      setOrderNotes(res.notes);
+                      router.refresh();
+                    });
+                  }}
+                >
+                  ✨ Suggest order
+                </button>
+              )}
             </div>
-            {orderNotes && (
+            {!board && orderNotes && (
               <div className="mt-1 rounded bg-team-blue-light/60 p-1.5 text-[11px] font-semibold text-neutral-700">
                 {orderNotes.slice(0, 5).map((n) => (
                   <p key={n}>{n}</p>
@@ -719,66 +681,18 @@ export function Dashboard(props: Props) {
               ))}
             </ol>
           </div>
-          <div className="rounded-lg border border-line bg-paper p-2 text-sm">
-            <span className="text-xs font-bold uppercase">Innings pitched</span>
-            {Object.entries(props.pitchInningsByPlayer)
-              .filter(([, n]) => n > 0)
-              .map(([pid, n]) => (
-                <p key={pid}>
-                  {nameOf(pid)}: <b>{n}</b> inn, {props.gamePitchesByPlayer[pid] ?? 0} pitches
-                </p>
-              ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Box score strip */}
-      <div className="card overflow-x-auto p-3">
-        <table className="w-full min-w-[360px] text-center text-sm">
-          <thead>
-            <tr className="border-b border-line-strong">
-              <th className="py-1 text-left">Box</th>
-              {innings.map((i) => (
-                <th key={i} className={`px-2 py-1 ${i === game.currentInning ? "bg-team-blue-light" : ""}`}>{i}</th>
-              ))}
-              <th className="px-2 py-1 font-extrabold">R</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(["us", "them"] as const).map((side) => (
-              <tr key={side} className="border-b border-line">
-                <td className="py-1 text-left font-bold">
-                  {side === "us" ? "Crushers" : (game.opponent ?? "Them")}
-                </td>
-                {innings.map((i) => (
-                  <td key={i} className={`px-2 py-1 ${i === game.currentInning ? "bg-team-blue-light font-bold" : ""}`}>
-                    {scoreFor(i, side) ?? (i < game.currentInning ? 0 : "")}
-                  </td>
+          {!board && (
+            <div className="rounded-lg border border-line bg-paper p-2 text-sm">
+              <span className="text-xs font-bold uppercase">Innings pitched</span>
+              {Object.entries(props.pitchInningsByPlayer)
+                .filter(([, n]) => n > 0)
+                .map(([pid, n]) => (
+                  <p key={pid}>
+                    {nameOf(pid)}: <b>{n}</b> inn, {props.gamePitchesByPlayer[pid] ?? 0} pitches
+                  </p>
                 ))}
-                <td className="px-2 py-1 font-extrabold">{side === "us" ? usTotal : themTotal}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button
-            className="btn btn-primary text-sm"
-            onClick={() => startTransition(async () => { await addRun(game.id, "us", 1); router.refresh(); })}
-          >
-            +1 Crushers
-          </button>
-          <button
-            className="btn text-sm"
-            onClick={() => startTransition(async () => { await addRun(game.id, "them", 1); router.refresh(); })}
-          >
-            +1 {game.opponent ?? "Them"}
-          </button>
-          <button
-            className="btn text-sm"
-            onClick={() => startTransition(async () => { await addRun(game.id, "us", -1); router.refresh(); })}
-          >
-            −1 Crushers
-          </button>
+            </div>
+          )}
         </div>
       </div>
 

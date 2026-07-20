@@ -256,9 +256,9 @@ async function CoachPanels({
       line: `${raterCount} ${raterCount === 1 ? "coach" : "coaches"} rating · ${unrated.length} unrated`,
     },
     {
-      href: "/lineup",
-      title: "Lineup lab",
-      line: "Build a field from the current matrix",
+      href: "/roster",
+      title: "Roster",
+      line: "Every player: ratings, stats, feedback",
     },
     {
       href: "/weekend",

@@ -4,6 +4,7 @@
 // functional for demos and flips on by editing this one file.
 
 export const FUTURE_PREVIEW_LINKS = [
+  { href: "/schedule", label: "Schedule" },
   { href: "/availability", label: "Availability" },
   { href: "/players", label: "Players" },
   { href: "/progress", label: "Progress" },

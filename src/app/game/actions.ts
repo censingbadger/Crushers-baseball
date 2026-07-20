@@ -69,12 +69,13 @@ export async function createGame(formData: FormData): Promise<void> {
     .limit(1);
   if (!event) redirect("/games?error=1");
 
-  // Seed the lineup from the solver over RSVP'd full-time players.
+  // Seed the lineup from the solver. Everyone on the roster is eligible —
+  // practice and hopeful players included (Mike: "RJ and Ben and Owen
+  // should all be available to be put into any game"); only an explicit
+  // RSVP "no" keeps a player out of the seed.
   const roster = await getRoster(event.seasonId);
   const rsvps = (await getRsvpsForEvents([event.id])).get(event.id);
-  const pool = roster.filter(
-    (p) => p.status === "full" && rsvps?.get(p.playerId) !== "no",
-  );
+  const pool = roster.filter((p) => rsvps?.get(p.playerId) !== "no");
   const ratings = await getCurrentRatings(event.seasonId);
   const blended = blendedLookup(ratings);
   const candidates: LineupCandidate[] = pool.map((p) => ({
@@ -418,6 +419,70 @@ export async function swapBattingSpot(
     .set({ spot: a.spot })
     .where(eq(tables.battingOrders.id, b.id));
   revalidatePath(`/game/${gameId}`);
+}
+
+/**
+ * The Lineup lab, absorbed: solve the strongest defensive alignment for
+ * the players in this game and apply it from the current inning onward.
+ * Bench falls out of the solve (extra players sit).
+ */
+export async function autoArrangeField(gameId: string): Promise<{ ok: boolean }> {
+  await requireCoach();
+  const db = await getDb();
+  const [game] = await db
+    .select()
+    .from(tables.liveGames)
+    .where(eq(tables.liveGames.id, gameId))
+    .limit(1);
+  if (!game) return { ok: false };
+
+  const assignmentRows = await db
+    .select()
+    .from(tables.gameAssignments)
+    .where(eq(tables.gameAssignments.gameId, gameId));
+  const playerIds = [
+    ...new Set(
+      assignmentRows
+        .filter((r) => r.inning === game.currentInning)
+        .map((r) => r.playerId),
+    ),
+  ];
+  if (playerIds.length === 0) return { ok: false };
+
+  const roster = await getRoster(game.seasonId);
+  const blended = blendedLookup(await getCurrentRatings(game.seasonId));
+  const nameOf = new Map(roster.map((p) => [p.playerId, `${p.firstName} ${p.lastName}`]));
+  const candidates: LineupCandidate[] = playerIds.map((id) => ({
+    playerId: id,
+    name: nameOf.get(id) ?? "?",
+    ratings: blended.get(id) ?? new Map(),
+  }));
+  const solution = solveLineup(candidates);
+
+  const assigned = new Map<string, string>();
+  for (const pos of POSITIONS) {
+    const a = solution.assignments[pos];
+    if (a) assigned.set(a.playerId, pos);
+  }
+  for (let inning = game.currentInning; inning <= game.innings; inning++) {
+    for (const pid of playerIds) {
+      const position = assigned.get(pid) ?? BENCH;
+      await db
+        .delete(tables.gameAssignments)
+        .where(
+          and(
+            eq(tables.gameAssignments.gameId, gameId),
+            eq(tables.gameAssignments.inning, inning),
+            eq(tables.gameAssignments.playerId, pid),
+          ),
+        );
+      await db
+        .insert(tables.gameAssignments)
+        .values({ gameId, inning, playerId: pid, position });
+    }
+  }
+  revalidatePath(`/game/${gameId}`);
+  return { ok: true };
 }
 
 /**

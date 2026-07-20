@@ -58,6 +58,16 @@ export default async function RatePlayerPage({
 
       <form action={saveRatings} className="card space-y-4 p-4">
         <input type="hidden" name="playerId" value={player.id} />
+        <div>
+          <label className="label" htmlFor="day">Feedback for (date)</label>
+          <input
+            className="field max-w-44"
+            type="date"
+            id="day"
+            name="day"
+            defaultValue={new Date().toISOString().slice(0, 10)}
+          />
+        </div>
         {DIMENSIONS.map((dim, i) => (
           <div key={dim.key}>
             {i === 5 && (

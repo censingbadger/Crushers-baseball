@@ -4,10 +4,16 @@ import type { Position } from "@/db/schema";
 import { blendedLookup, getCurrentRatings } from "@/lib/matrix";
 import {
   addBatting,
+  addCatching,
+  addFielding,
   addPitching,
   EMPTY_BATTING,
+  EMPTY_CATCHING,
+  EMPTY_FIELDING,
   EMPTY_PITCHING,
   type BattingTotals,
+  type CatchingTotals,
+  type FieldingTotals,
   type PitchingTotals,
 } from "@/lib/stats";
 
@@ -66,6 +72,50 @@ export async function getSeasonPitchingByPlayer(
   const out = new Map<string, PitchingTotals>();
   for (const { playerId, ...line } of rows) {
     out.set(playerId, addPitching(out.get(playerId) ?? EMPTY_PITCHING, line));
+  }
+  return out;
+}
+
+export async function getSeasonFieldingByPlayer(
+  seasonId: string,
+): Promise<Map<string, FieldingTotals>> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      playerId: tables.fieldingLines.playerId,
+      po: tables.fieldingLines.po,
+      a: tables.fieldingLines.a,
+      e: tables.fieldingLines.e,
+      dp: tables.fieldingLines.dp,
+    })
+    .from(tables.fieldingLines)
+    .innerJoin(tables.statGames, eq(tables.fieldingLines.statGameId, tables.statGames.id))
+    .where(eq(tables.statGames.seasonId, seasonId));
+  const out = new Map<string, FieldingTotals>();
+  for (const { playerId, ...line } of rows) {
+    out.set(playerId, addFielding(out.get(playerId) ?? EMPTY_FIELDING, line));
+  }
+  return out;
+}
+
+export async function getSeasonCatchingByPlayer(
+  seasonId: string,
+): Promise<Map<string, CatchingTotals>> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      playerId: tables.catchingLines.playerId,
+      outs: tables.catchingLines.outs,
+      pb: tables.catchingLines.pb,
+      sbAllowed: tables.catchingLines.sbAllowed,
+      cs: tables.catchingLines.cs,
+    })
+    .from(tables.catchingLines)
+    .innerJoin(tables.statGames, eq(tables.catchingLines.statGameId, tables.statGames.id))
+    .where(eq(tables.statGames.seasonId, seasonId));
+  const out = new Map<string, CatchingTotals>();
+  for (const { playerId, ...line } of rows) {
+    out.set(playerId, addCatching(out.get(playerId) ?? EMPTY_CATCHING, line));
   }
   return out;
 }

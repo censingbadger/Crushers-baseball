@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { POSITIONS } from "@/db/schema";
-import { saveMatrixCell } from "@/app/matrix/actions";
+import { clearMatrixRow, saveMatrixCell } from "@/app/matrix/actions";
 
 interface Player {
   playerId: string;
@@ -101,15 +102,35 @@ export function QuickRate({
         ))}
       </div>
 
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-neutral-500">
-          Saves on tap · rating as Coach {rater}
+          Every tap saves instantly · rating as Coach {rater}
         </p>
-        {idx < players.length - 1 && (
-          <button className="btn btn-primary px-4 py-1.5 text-sm" onClick={() => setIdx(idx + 1)}>
-            Next player →
+        <div className="flex gap-2">
+          <button
+            className="text-xs text-red-700 underline"
+            onClick={() => {
+              if (!window.confirm(`Clear ALL of your ratings for ${player.name}? Other coaches' numbers are untouched.`)) return;
+              const fd = new FormData();
+              fd.set("playerId", player.playerId);
+              fd.set("rater", rater);
+              setValues((v) => ({ ...v, [player.playerId]: {} }));
+              startTransition(async () => {
+                await clearMatrixRow(fd);
+              });
+            }}
+          >
+            Clear my row
           </button>
-        )}
+          {idx < players.length - 1 && (
+            <button className="btn px-4 py-1.5 text-sm" onClick={() => setIdx(idx + 1)}>
+              Next player →
+            </button>
+          )}
+          <Link className="btn btn-primary px-4 py-1.5 text-sm" href="/matrix">
+            ✓ Save &amp; done
+          </Link>
+        </div>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-1 border-t border-line pt-2">
