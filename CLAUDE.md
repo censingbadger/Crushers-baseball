@@ -42,6 +42,10 @@
   only in the full-field solver; blank cells are exactly neutral
   (multiplier 1.0) so an unmarked chart behaves like ability-only.
   Pitch Smart still zeroes resting arms at P in auto-arrange. The
+  pitching-first game plan (dugout "Pitching plan" panel →
+  `planFullGame`) pins a declared arm per inning and solves every
+  inning in one pass with a +0.5/inning-sat bench-fairness boost;
+  batting order is never touched by planning. The
   practice sorter (`/practice`, `src/lib/practice.ts`) splits the
   roster across stations from the same signals (develop spots /
   needs-work primaries / ★ asks / usage), never-cells excluded. The

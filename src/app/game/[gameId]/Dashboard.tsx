@@ -8,6 +8,7 @@ import {
   applySuggestedBattingOrder,
   autoArrangeField,
   moveGamePlayer,
+  planFullGame,
   setInning,
   setUpSpot,
   swapBattingSpot,
@@ -128,6 +129,8 @@ interface Props {
   aspiringByPlayer: Record<string, string[]>;
   /** playerId -> season bench share (0..1) — the fairness number. */
   seasonSatShareByPlayer: Record<string, number>;
+  /** inning -> playerId currently at P, prefilling the pitching plan. */
+  pitcherByInning: Record<number, string>;
   score: { inning: number; side: "us" | "them"; runs: number }[];
   battingOrder: { playerId: string; spot: number }[];
 }
@@ -149,6 +152,10 @@ export function Dashboard(props: Props) {
   // every device in the dugout shows the same batter.
   const [upSpot, setUpSpotLocal] = useState(game.upSpot);
   useEffect(() => setUpSpotLocal(game.upSpot), [game.upSpot]);
+  // Pitching plan, prefilled from each inning's current pitcher.
+  const [plan, setPlan] = useState<(string | null)[]>(() =>
+    Array.from({ length: game.innings }, (_, i) => props.pitcherByInning[i + 1] ?? null),
+  );
   // The slot a move just vacated — the assist island leads with it.
   const [focusGap, setFocusGap] = useState<string | null>(null);
   // The slot a move just filled — the island shows its depth chart.
@@ -368,6 +375,28 @@ export function Dashboard(props: Props) {
 
   const roleAt = (pid: string, slot: string): string | undefined =>
     (props.rolesByPlayer[pid] as Record<string, string> | undefined)?.[slot];
+
+  // Arms for the plan's dropdowns: best P-fit first, Pitch Smart status
+  // inline so a resting arm is never picked by accident.
+  const pitcherOptions = useMemo(
+    () =>
+      players
+        .map((p) => {
+          const rating = props.ratingsByPlayer[p.id]?.P;
+          const role = roleAt(p.id, "P");
+          const resting = !eligibility[p.id]?.eligible;
+          const mult =
+            role === "primary" ? 1.25 : role === "secondary" ? 1.1 : role === "never" ? 0 : 1;
+          return {
+            id: p.id,
+            sort: (rating ?? 1) * mult - (resting ? 100 : 0),
+            label: `${nameOf(p.id)} · P ${rating ?? "·"}${role ? ` (${role})` : ""}${resting ? " 🚫 resting" : ""}`,
+          };
+        })
+        .sort((a, b) => b.sort - a.sort),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [players, props.ratingsByPlayer, props.rolesByPlayer, eligibility, nameOf],
+  );
 
   // Gray ghost on an empty slot: the best one-move (bench) fill.
   const ghostFor = (slot: string) =>
@@ -625,6 +654,65 @@ export function Dashboard(props: Props) {
                 : "Drag a player onto the field (hold a beat on phones), or tap to select."}
             </p>
           </div>
+
+          {/* The pitching-first game plan: declare the arms inning by
+              inning, one tap arranges every position around them for the
+              whole game. Batting order is never touched. */}
+          {!board && (
+            <details className="rounded-lg border border-line bg-paper p-2" data-testid="pitch-plan">
+              <summary className="cursor-pointer text-xs font-bold uppercase">
+                🗓 Pitching plan
+              </summary>
+              <div className="mt-1.5 space-y-1">
+                {Array.from({ length: game.innings }, (_, i) => (
+                  <label key={i} className="flex items-center gap-1.5 text-xs font-semibold">
+                    <span className="w-9 shrink-0">Inn {i + 1}</span>
+                    <select
+                      className="w-full rounded border border-line px-1 py-1"
+                      value={plan[i] ?? ""}
+                      onChange={(e) =>
+                        setPlan((p) => {
+                          const n = [...p];
+                          n[i] = e.target.value || null;
+                          return n;
+                        })
+                      }
+                    >
+                      <option value="">— solver picks —</option>
+                      {pitcherOptions.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+                <button
+                  className="btn btn-primary mt-1 w-full py-1.5 text-xs"
+                  disabled={pending || busy}
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        `Plan all ${game.innings} innings around these pitchers? Every inning's positions will be rearranged — the batting order stays unchanged.`,
+                      )
+                    )
+                      return;
+                    startTransition(async () => {
+                      await planFullGame(game.id, plan, mode);
+                      router.refresh();
+                    });
+                  }}
+                >
+                  ⚡ Plan all {game.innings} innings
+                </button>
+                <p className="text-[10px] font-semibold text-neutral-500">
+                  The solver fills the other eight around each arm and rotates
+                  the bench as innings pass. Step through the innings ◀ ▶ to
+                  review; drag to fine-tune any of them.
+                </p>
+              </div>
+            </details>
+          )}
 
           {/* The configurator island: gap fills first, then tune-ups.
               Coach view only — the dugout board stays evaluation-free. */}

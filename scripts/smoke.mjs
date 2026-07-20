@@ -305,6 +305,35 @@ const upRowAfter = await page
   .textContent();
 if (!upRowAfter?.includes("2.")) fail("Next batter did not persist the marker server-side");
 
+// Pitching-first game plan: declare a different arm for inning 2, plan
+// the whole game, and the stepper shows the new pitcher in inning 2 with
+// every slot filled.
+await page.click("summary:has-text('Pitching plan')");
+const planSelects = page.locator("[data-testid=pitch-plan] select");
+const inn1Pitcher = await planSelects.nth(0).inputValue();
+const inn2Options = await planSelects
+  .nth(1)
+  .locator("option")
+  .evaluateAll((os) => os.map((o) => ({ v: o.value, t: o.textContent })));
+const alt = inn2Options.find((o) => o.v && o.v !== inn1Pitcher && !o.t?.includes("resting"));
+if (!alt) fail("no alternate pitcher available for the plan test");
+await planSelects.nth(1).selectOption(alt.v);
+page.once("dialog", (d) => d.accept());
+await page.click("button:has-text('Plan all')");
+await page.waitForTimeout(1800);
+// Step to inning 2: the declared arm is on the mound, field fully staffed.
+await page.locator("button:has-text('▶')").first().click();
+await page.waitForTimeout(900);
+const inn2Empty = await page.locator("button:has-text('—')").count();
+if (inn2Empty > 0) fail(`game plan left ${inn2Empty} slots empty in inning 2`);
+const pChip2 = await page.locator("button:has(span:text-is('P'))").first().textContent();
+const altFirst = alt.t?.split(" · ")[0] ?? "";
+if (!pChip2?.includes(altFirst)) fail(`inning 2 pitcher should be ${altFirst}, chip says: ${pChip2}`);
+// Back to inning 1 — its pitcher was pinned to the original arm.
+await page.locator("button:has-text('◀')").first().click();
+await page.waitForTimeout(900);
+await page.screenshot({ path: `${SHOTS}/10c-pitch-plan.png`, fullPage: true });
+
 // Move the pitcher to the bench (tap pitcher, tap bench button).
 const pitcherBtn = page.locator("button:has(span:text-is('P'))").first();
 await pitcherBtn.click();

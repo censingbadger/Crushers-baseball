@@ -240,6 +240,108 @@ export async function setInning(gameId: string, inning: number): Promise<void> {
   revalidatePath(`/game/${gameId}`);
 }
 
+/**
+ * The pitching-first game plan: the coach declares who pitches each
+ * inning, and the solver arranges the other eight positions around each
+ * arm for the WHOLE game in one pass — role/mode weights as usual, plus
+ * a bench-fairness boost that grows with innings sat inside this plan so
+ * the same kids don't ride the bench all game. The batting order is
+ * never touched: it holds for the game (usually the tournament).
+ */
+export async function planFullGame(
+  gameId: string,
+  pitchers: (string | null)[],
+  mode: LineupMode = "compete",
+): Promise<{ ok: boolean }> {
+  await requireCoach();
+  const db = await getDb();
+  const [game] = await db
+    .select()
+    .from(tables.liveGames)
+    .where(eq(tables.liveGames.id, gameId))
+    .limit(1);
+  if (!game) return { ok: false };
+
+  const assignmentRows = await db
+    .select()
+    .from(tables.gameAssignments)
+    .where(eq(tables.gameAssignments.gameId, gameId));
+  const playerIds = [...new Set(assignmentRows.map((r) => r.playerId))];
+  if (playerIds.length === 0) return { ok: false };
+  const pool = new Set(playerIds);
+
+  const roster = await getRoster(game.seasonId);
+  const blended = blendedLookup(await getCurrentRatings(game.seasonId));
+  const nameOf = new Map(roster.map((p) => [p.playerId, `${p.firstName} ${p.lastName}`]));
+  const candidates: LineupCandidate[] = playerIds.map((id) => ({
+    playerId: id,
+    name: nameOf.get(id) ?? "?",
+    ratings: blended.get(id) ?? new Map(),
+  }));
+
+  const aspRows = await db
+    .select({
+      playerId: tables.aspirations.playerId,
+      desiredPositions: tables.aspirations.desiredPositions,
+    })
+    .from(tables.aspirations)
+    .where(eq(tables.aspirations.seasonId, game.seasonId));
+  const aspiringByPlayer: Record<string, string[]> = {};
+  for (const row of aspRows) {
+    const tokens = aspiringTokens(row.desiredPositions);
+    if (tokens.length > 0) aspiringByPlayer[row.playerId] = tokens;
+  }
+  const roles = rolesByPlayerFrom(await getPositionRoles(game.seasonId));
+
+  const FAIRNESS = 0.5; // per benched inning, added to every cell
+  const sat: Record<string, number> = {};
+  for (const pid of playerIds) sat[pid] = 0;
+
+  for (let inning = 1; inning <= game.innings; inning++) {
+    const weights = solverWeights(
+      playerIds,
+      ratingsRecordOf(playerIds, blended),
+      roles,
+      mode,
+      aspiringByPlayer,
+    );
+    for (const pid of playerIds) {
+      if (sat[pid] === 0) continue;
+      for (const pos of POSITIONS) {
+        if (weights[pid][pos] > 0) weights[pid][pos] += FAIRNESS * sat[pid];
+      }
+    }
+    const declared = pitchers[inning - 1];
+    const pins =
+      declared && pool.has(declared) ? { P: declared } : {};
+    const solution = solveLineup(candidates, pins, weights);
+
+    const assigned = new Map<string, string>();
+    for (const pos of POSITIONS) {
+      const a = solution.assignments[pos];
+      if (a) assigned.set(a.playerId, pos);
+    }
+    for (const pid of playerIds) {
+      const position = assigned.get(pid) ?? BENCH;
+      await db
+        .delete(tables.gameAssignments)
+        .where(
+          and(
+            eq(tables.gameAssignments.gameId, gameId),
+            eq(tables.gameAssignments.inning, inning),
+            eq(tables.gameAssignments.playerId, pid),
+          ),
+        );
+      await db
+        .insert(tables.gameAssignments)
+        .values({ gameId, inning, playerId: pid, position });
+      if (position === BENCH) sat[pid] += 1;
+    }
+  }
+  revalidatePath(`/game/${gameId}`);
+  return { ok: true };
+}
+
 /** The dugout board's "who's up" marker — tap a batter, everyone syncs. */
 export async function setUpSpot(gameId: string, spot: number): Promise<void> {
   await requireCoach();
