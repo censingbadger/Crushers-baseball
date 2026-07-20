@@ -56,13 +56,19 @@ if (homeText?.includes("Next up") || homeText?.includes("Full schedule")) {
 }
 await page.screenshot({ path: `${SHOTS}/02-dashboard.png`, fullPage: true });
 
-// Roster shows coach-only guardian contact info.
+// Roster: expandable card per player. The "everything" panel opens on
+// tap and carries the coach-only guardian contacts + an edit affordance.
 await page.goto(BASE + "/roster");
 const rosterText = await page.textContent("main");
 if (!rosterText?.includes("Perry Vance")) fail("coach roster missing guardian contact");
-// Every row carries an explicit edit affordance for coaches.
-if ((await page.locator("tbody a:has-text('Edit')").count()) === 0)
-  fail("roster rows missing the Edit button");
+if ((await page.locator("main a:has-text('Edit')").count()) === 0)
+  fail("roster cards missing the Edit link");
+await page.locator("[data-testid=expand-everything]").first().click();
+await page.waitForTimeout(300);
+if (!(await page.locator("p:has-text('Parents & guardians')").first().isVisible()))
+  fail("expanded roster card missing the guardians section");
+if (!(await page.locator("main a:has-text('Edit')").first().isVisible()))
+  fail("expanded roster card missing a visible Edit link");
 await page.screenshot({ path: `${SHOTS}/03-roster.png`, fullPage: true });
 
 // Availability grids render, with the weekend planner rollup.
@@ -132,10 +138,10 @@ const cellAfter = page.locator(`button[data-cell='${cellKey}']`);
 if ((await cellAfter.textContent())?.trim().charAt(0) !== "P") {
   fail("depth chart tap did not persist as primary");
 }
-// That primary now leads the roster's Positions column as an orange chip.
+// That primary now leads the roster card's position chips in orange.
 await page.goto(BASE + "/roster");
-if ((await page.locator("tbody span[title^='Primary']").count()) === 0)
-  fail("roster Positions column missing the depth-chart primary chip");
+if ((await page.locator("summary span[title^='Primary']").count()) === 0)
+  fail("roster cards missing the depth-chart primary chip");
 await page.goto(BASE + "/depth");
 for (let i = 0; i < 5; i++) {
   await cellAfter.click();
@@ -186,9 +192,9 @@ const weekendText = await page.textContent("main");
 if (!weekendText?.includes("Position coverage")) fail("weekend balance panel missing");
 await page.screenshot({ path: `${SHOTS}/08-weekend.png`, fullPage: true });
 
-// Player edit page loads for the coach.
+// Player edit page loads for the coach (name in the card header links it).
 await page.goto(BASE + "/roster");
-await page.click("tbody a[href^='/roster/']");
+await page.click("summary a[href^='/roster/']");
 await page.waitForURL("**/roster/**");
 const editText = await page.textContent("main");
 if (!editText?.includes("Careful zone")) fail("player edit page incomplete");

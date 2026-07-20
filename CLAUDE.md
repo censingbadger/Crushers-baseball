@@ -55,9 +55,12 @@
   practice sorter (`/practice`, `src/lib/practice.ts`) splits the
   roster across stations from the same signals (develop spots /
   needs-work primaries / ★ asks / usage), never-cells excluded. The
-  roster's Positions column = depth-chart primaries/secondaries with
-  blended ratings (top-3 rated as fallback); parents see only the
-  self-reported text.
+  roster (coach view) = one expandable card per player: header shows
+  jersey/name/status/position chips (depth-chart primaries/secondaries
+  with blended ratings, top-3 rated as fallback), the "everything"
+  panel holds facts, guardian contacts (mailto/tel), matrix, BARS
+  levels, GC season, playing time, and the Edit link; parents see a
+  simple list with only the self-reported positions text.
 - **BARS feedback (`src/lib/bars.ts`, `bars_ratings`)**: player feedback
   is criterion-referenced 1–5 (3 = the 11U standard) across D1–D9 + P/C
   role modules, with full behavioral anchors on screen during entry.
