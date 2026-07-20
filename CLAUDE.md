@@ -14,12 +14,14 @@
   `serverExternalPackages` in `next.config.ts` (bundling breaks its WASM).
 - **Auth**: coach/parent roles. Anything contact/medical is coach-only —
   enforce in server components/actions, not just UI.
-- **Coach-first mode**: the active tool is ratings/lineups/dugout/stats;
-  family-facing features (schedule, availability, players, progress,
-  reports) are parked behind the "Future preview" nav group + amber
-  banners, driven by `src/lib/preview.ts`. Don't delete parked features —
-  they turn back on by editing that file. Parent logins exist but were
-  never distributed.
+- **Coach-first mode**: the active set is exactly Game day, Roster, and
+  the Performance group (matrix / depth chart / feedback / stats /
+  reports) — Mike's slim-menu directive. Everything else (weekend,
+  practice stations, drills, families, import, schedule, availability,
+  players, progress) is parked behind the "Future preview" nav group +
+  amber banners, driven by `src/lib/preview.ts`. Parked ≠ deleted —
+  pages stay functional and turn back on by editing that file. Parent
+  logins exist but were never distributed.
 - **Phase 8 simplification (Mike's direction)**: GameChanger records
   games — this app plans and runs the dugout. No score/clock/outs UI.
   The dugout has a coach view (assist island, Pitch Smart) and a

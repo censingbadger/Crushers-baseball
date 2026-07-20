@@ -38,6 +38,13 @@ await page.waitForURL(BASE + "/");
 const heading = await page.textContent("h1");
 if (!heading?.includes("Crushers Blue")) fail(`unexpected dashboard heading: ${heading}`);
 
+// The slim coach menu: Game day, Roster, Performance — planning and admin
+// live in Future preview now.
+const headerText = await page.textContent("header");
+if (headerText?.includes("Planning")) fail("coach nav still shows Planning group");
+if (headerText?.includes("Admin")) fail("coach nav still shows Admin group");
+if (!headerText?.includes("Performance")) fail("coach nav missing Performance group");
+
 // Coach home is the four-needs launcher — no schedule hero, no parked links.
 const homeText = await page.textContent("main");
 for (const need of ["Game day", "Position matrix", "Roster", "Stats"]) {
