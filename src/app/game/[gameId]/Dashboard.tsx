@@ -468,7 +468,7 @@ export function Dashboard(props: Props) {
       <div
         className={
           board
-            ? "grid gap-3 lg:grid-cols-[3fr_2fr] lg:items-start"
+            ? "grid gap-3 lg:grid-cols-[1fr_300px] lg:items-start"
             : "grid gap-3 lg:grid-cols-[1fr_260px]"
         }
       >
@@ -736,7 +736,7 @@ export function Dashboard(props: Props) {
               <span className="flex items-center gap-1.5">
                 {props.battingOrder.length > 0 && (
                   <button
-                    className={`btn ${board ? "px-3 py-1.5 text-sm" : "px-2 py-0.5 text-xs"}`}
+                    className={`btn ${board ? "px-2.5 py-1 text-xs" : "px-2 py-0.5 text-xs"}`}
                     disabled={pending}
                     data-testid="next-batter"
                     onClick={() => {
@@ -779,7 +779,7 @@ export function Dashboard(props: Props) {
                 {orderNotes.length > 5 && <p>… rest by overall quality.</p>}
               </div>
             )}
-            <ol className={`mt-1 ${board ? "space-y-1" : "space-y-0.5"} text-sm`}>
+            <ol className="mt-1 space-y-0.5 text-sm">
               {props.battingOrder.map((o, i) => {
                 const n = props.battingOrder.length;
                 const upIdx = Math.max(
@@ -794,7 +794,7 @@ export function Dashboard(props: Props) {
                     key={o.playerId}
                     className={`flex items-center gap-1 rounded px-1 ${
                       isUp ? "bg-team-orange/20 ring-1 ring-team-orange" : ""
-                    } ${board ? "py-1" : ""}`}
+                    }`}
                   >
                     {/* Tap the batter to mark him up — the dugout's one job. */}
                     <button
@@ -808,10 +808,10 @@ export function Dashboard(props: Props) {
                         });
                       }}
                     >
-                      <span className={`w-5 shrink-0 text-right font-mono ${board ? "text-sm" : "text-xs"}`}>
+                      <span className={`w-5 shrink-0 text-right font-mono text-xs`}>
                         {i + 1}.
                       </span>
-                      <span className={`truncate font-semibold ${board ? "text-lg" : ""}`}>
+                      <span className="truncate font-semibold">
                         {nameOf(o.playerId)}
                       </span>
                       {isUp && (
@@ -830,7 +830,7 @@ export function Dashboard(props: Props) {
                         </span>
                       )}
                     </button>
-                    <span className={`shrink-0 text-neutral-500 ${board ? "text-sm" : "text-[11px]"}`}>
+                    <span className={`shrink-0 text-neutral-500 text-[11px]`}>
                       {current[o.playerId] === BENCH ? "bench" : current[o.playerId]}
                     </span>
                     {!board && (
