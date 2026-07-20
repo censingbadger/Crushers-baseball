@@ -15,6 +15,7 @@ import {
   RSVP_LABEL,
 } from "@/lib/format";
 import { addSignup, removeSignup, setRsvp } from "@/app/schedule/actions";
+import { FuturePreviewBanner } from "@/components/FuturePreviewBanner";
 
 const RSVP_STYLES: Record<string, string> = {
   yes: "bg-green-600 text-white",
@@ -76,6 +77,7 @@ export default async function EventPage({
       </div>
 
       <section className="card overflow-x-auto p-4">
+        <FuturePreviewBanner compact />
         <h2 className="mb-2 text-lg font-bold">Who's in</h2>
         <table className="w-full min-w-[420px] text-sm">
           <thead>
@@ -139,6 +141,7 @@ export default async function EventPage({
       </section>
 
       <section className="card p-4">
+        <FuturePreviewBanner compact />
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <h2 className="text-lg font-bold">Signups</h2>
           {signupKinds.map((k) => {
