@@ -17,6 +17,8 @@ export interface LineupAssignment {
   name: string;
   rating: number;
   pinned: boolean;
+  /** No coach has rated this player here — the 1 is a guess, not a grade. */
+  unrated: boolean;
 }
 
 export interface LineupSolution {
@@ -118,6 +120,7 @@ export function solveLineup(
       name: candidate.name,
       rating: ratingOf(candidate, pos),
       pinned: true,
+      unrated: !candidate.ratings.has(pos),
     };
     pinnedPlayerIds.add(playerId);
   }
@@ -145,6 +148,7 @@ export function solveLineup(
           name: c.name,
           rating: ratingOf(c, openPositions[r]),
           pinned: false,
+          unrated: !c.ratings.has(openPositions[r]),
         };
       }
     }

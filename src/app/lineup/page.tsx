@@ -200,6 +200,22 @@ export default async function LineupPage({
               ))}
             </ul>
           )}
+          {(() => {
+            const thin = pool
+              .map((c) => ({ c, rated: c.ratings.size }))
+              .filter((t) => t.rated < POSITIONS.length);
+            if (thin.length === 0) return null;
+            return (
+              <p className="mb-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">
+                Blank matrix cells count as 1, so the solver is partly guessing
+                for:{" "}
+                {thin
+                  .map((t) => `${t.c.name} (${t.rated}/9 rated)`)
+                  .join(", ")}
+                . <Link className="underline" href="/matrix/quick">Quick entry →</Link>
+              </p>
+            );
+          })()}
           <div className="grid gap-3 sm:grid-cols-2">
             <table className="text-sm">
               <tbody>
@@ -217,12 +233,22 @@ export default async function LineupPage({
                                 pinned
                               </span>
                             )}
+                            {a.unrated && (
+                              <span
+                                className="ml-1 rounded border border-amber-500 bg-amber-100 px-1 text-[10px] font-bold uppercase text-amber-800"
+                                title="No coach has rated this player at this position — the solver counts blanks as 1 and is guessing."
+                              >
+                                unrated here
+                              </span>
+                            )}
                           </>
                         ) : (
                           <span className="text-red-700">— unfilled —</span>
                         )}
                       </td>
-                      <td className="py-1 text-right font-bold">{a?.rating ?? ""}</td>
+                      <td className="py-1 text-right font-bold">
+                        {a ? (a.unrated ? "?" : a.rating) : ""}
+                      </td>
                     </tr>
                   );
                 })}
