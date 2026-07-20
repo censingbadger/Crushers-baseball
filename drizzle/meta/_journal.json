@@ -57,6 +57,13 @@
       "when": 1784492479959,
       "tag": "0007_rapid_swordsman",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784504897247,
+      "tag": "0008_nasty_zodiak",
+      "breakpoints": true
     }
   ]
 }

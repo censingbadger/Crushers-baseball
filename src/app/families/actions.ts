@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getDb, tables } from "@/db";
 import { requireCoach } from "@/lib/auth";
@@ -84,7 +84,10 @@ export async function resetFamilyPassword(userId: string): Promise<IssuedCredent
   const password = generatePassword();
   await db
     .update(tables.users)
-    .set({ passwordHash: bcrypt.hashSync(password, 10) })
+    .set({
+      passwordHash: bcrypt.hashSync(password, 10),
+      sessionEpoch: sql`${tables.users.sessionEpoch} + 1`,
+    })
     .where(eq(tables.users.id, userId));
   return {
     family: user.displayName,
@@ -167,7 +170,10 @@ export async function revokeLogin(formData: FormData): Promise<void> {
   if (!user || user.role !== "parent") return; // coaches can't lock each other out here
   await db
     .update(tables.users)
-    .set({ passwordHash: null })
+    .set({
+      passwordHash: null,
+      sessionEpoch: sql`${tables.users.sessionEpoch} + 1`,
+    })
     .where(eq(tables.users.id, userId));
   revalidatePath("/families");
 }

@@ -123,7 +123,7 @@ export default async function LineupPage({
                   name="avail"
                   value={p.playerId}
                   defaultChecked={availableIds.has(p.playerId)}
-                  className="h-4 w-4 accent-team-orange"
+                  className="h-5 w-5 accent-team-orange"
                 />
                 <span>
                   {p.firstName} {p.lastName}

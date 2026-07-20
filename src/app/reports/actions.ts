@@ -46,8 +46,15 @@ export async function generateReport(formData: FormData): Promise<void> {
   try {
     ({ text, draftedBy } = await draftReport(ctx));
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "draft failed";
-    redirect(`/reports?month=${month}&error=${encodeURIComponent(msg)}`);
+    // Keep the banner human: first line of the problem, no raw API JSON.
+    const raw = err instanceof Error ? err.message : "draft failed";
+    const msg =
+      raw.replace(/\{[\s\S]*$/, "").trim().slice(0, 140) || "the AI request failed";
+    redirect(
+      `/reports?month=${month}&error=${encodeURIComponent(
+        `${msg} — the built-in template still works; check the API key for AI drafts.`,
+      )}`,
+    );
   }
 
   let reportId: string;

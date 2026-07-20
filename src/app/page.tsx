@@ -67,8 +67,8 @@ export default async function DashboardPage() {
                     {EVENT_TYPE_LABEL[e.type]}
                   </span>
                   <Link href={`/schedule/${e.id}`} className="min-w-0 flex-1 basis-52 font-semibold underline-offset-2 hover:underline">
-                    {e.title ?? EVENT_TYPE_LABEL[e.type]}
-                    <span className="ml-2 font-normal text-neutral-600">
+                    {e.title}
+                    <span className={e.title ? "ml-2 font-normal text-neutral-600" : "font-normal text-neutral-700"}>
                       {formatEventDate(e.startsAt)} · {formatEventTime(e.startsAt, e.endsAt)}
                       {e.location ? ` · ${e.location}` : ""}
                     </span>

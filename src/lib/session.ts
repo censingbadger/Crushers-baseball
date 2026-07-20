@@ -12,6 +12,8 @@ function secret(): string {
 export interface SessionPayload {
   userId: string;
   expiresAt: number; // epoch ms
+  /** Must match users.sessionEpoch — bumping it invalidates old cookies. */
+  epoch?: number;
 }
 
 function sign(data: string): string {

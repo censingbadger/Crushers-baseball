@@ -24,10 +24,11 @@ export default async function GamePage({
   const pitchInningsByPlayer: Record<string, number> = {};
   const gamePitchesByPlayer: Record<string, number> = {};
   for (const p of players) {
+    // Count only completed innings — the one in progress hasn't been "sat".
     benchInningsByPlayer[p.id] = benchInnings(
       assignmentRows,
       p.id,
-      game.currentInning,
+      game.currentInning - 1,
     );
   }
   for (const r of pitchRows) {

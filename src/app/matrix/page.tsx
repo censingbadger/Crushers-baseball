@@ -91,7 +91,7 @@ export default async function MatrixPage({
                   {pos}
                 </th>
               ))}
-              {editable && <th className="px-2 py-1" />}
+              {editable && <th className="sticky right-0 bg-paper px-2 py-1" />}
             </tr>
           </thead>
           <tbody>
@@ -109,7 +109,7 @@ export default async function MatrixPage({
                   <td className="whitespace-nowrap py-1.5 pr-2 font-semibold">
                     {p.firstName} {p.lastName}
                     {p.status !== "full" && (
-                      <span className="ml-1 rounded border border-line bg-team-blue-light px-1 py-0.5 text-[10px] font-bold uppercase">
+                      <span className="ml-1 rounded border border-line bg-team-blue-light px-1 py-0.5 text-[11px] font-bold uppercase">
                         {p.status}
                       </span>
                     )}
@@ -135,7 +135,7 @@ export default async function MatrixPage({
                     );
                   })}
                   {editable && (
-                    <td className="p-1">
+                    <td className="sticky right-0 bg-paper p-1">
                       <form id={`row-${p.playerId}`} action={saveMatrixRow}>
                         <input type="hidden" name="playerId" value={p.playerId} />
                         <input
@@ -146,7 +146,7 @@ export default async function MatrixPage({
                           className={activeTab === "new" ? "field mb-1 w-20 text-xs" : ""}
                           required
                         />
-                        <button className="btn px-2 py-0.5 text-xs" type="submit">
+                        <button className="btn px-2.5 py-1 text-xs" type="submit">
                           Save
                         </button>
                       </form>

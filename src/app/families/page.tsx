@@ -77,7 +77,7 @@ export default async function FamiliesPage() {
               <th className="py-1 pr-2">Players</th>
               <th className="py-1 pr-2">Email</th>
               <th className="py-1 pr-2">Login</th>
-              <th className="py-1">Actions</th>
+              <th className="sticky right-0 bg-paper py-1 pl-2">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -101,7 +101,7 @@ export default async function FamiliesPage() {
                           <span className="chip bg-team-blue-light">
                             {l.firstName}
                             <button
-                              className="ml-1 opacity-60 hover:opacity-100"
+                              className="ml-1 px-1.5 py-0.5 text-sm opacity-60 hover:opacity-100"
                               title={`Unlink ${l.firstName}`}
                               type="submit"
                             >
@@ -144,8 +144,8 @@ export default async function FamiliesPage() {
                       <span className="chip bg-line">n/a</span>
                     )}
                   </td>
-                  <td className="py-1.5">
-                    <div className="flex flex-wrap items-center gap-2">
+                  <td className="sticky right-0 bg-paper py-1.5 pl-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {account && (
                         <ResetButton
                           userId={account.id}
@@ -156,7 +156,7 @@ export default async function FamiliesPage() {
                         <form action={revokeLogin}>
                           <input type="hidden" name="userId" value={account.id} />
                           <button
-                            className="text-xs text-red-700 underline"
+                            className="btn px-2.5 py-1.5 text-xs text-red-700"
                             title="Blocks sign-in; reset password to restore"
                             type="submit"
                           >
@@ -169,7 +169,7 @@ export default async function FamiliesPage() {
                           <input type="hidden" name="userId" value={account.id} />
                           <input type="hidden" name="role" value="coach" />
                           <button
-                            className="text-xs text-team-blue-dark underline"
+                            className="btn px-2.5 py-1.5 text-xs text-team-blue-dark"
                             title="Coaches see contacts, ratings, and all tools"
                             type="submit"
                           >
@@ -181,7 +181,7 @@ export default async function FamiliesPage() {
                         <form action={removeGuardian}>
                           <input type="hidden" name="guardianId" value={g.id} />
                           <button
-                            className="text-xs text-red-700 underline"
+                            className="btn px-2.5 py-1.5 text-xs text-red-700"
                             title="Removes this guardian entirely"
                             type="submit"
                           >
@@ -218,7 +218,7 @@ export default async function FamiliesPage() {
                   <input type="hidden" name="userId" value={c.id} />
                   <input type="hidden" name="role" value="parent" />
                   <button
-                    className="text-xs text-team-blue-dark underline"
+                    className="btn px-2.5 py-1.5 text-xs text-team-blue-dark"
                     title="Back to a family account"
                     type="submit"
                   >

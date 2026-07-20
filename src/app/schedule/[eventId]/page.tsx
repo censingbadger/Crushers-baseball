@@ -94,7 +94,7 @@ export default async function EventPage({
                   <td className="py-1.5 pr-2 font-semibold">
                     {p.firstName} {p.lastName}
                     {p.status !== "full" && (
-                      <span className="ml-1 text-[10px] font-bold uppercase text-neutral-500">
+                      <span className="ml-1 text-[11px] font-bold uppercase text-neutral-500">
                         {p.status === "practice" ? "practice player" : "hopeful"}
                       </span>
                     )}
@@ -120,7 +120,7 @@ export default async function EventPage({
                             <input type="hidden" name="status" value={s} />
                             <button
                               type="submit"
-                              className={`rounded border border-line px-2 py-0.5 text-xs font-semibold hover:bg-team-blue-light ${
+                              className={`rounded-lg border border-line-strong px-3 py-1.5 text-sm font-semibold hover:bg-team-blue-light ${
                                 status === s ? RSVP_STYLES[s] : "bg-paper"
                               }`}
                             >

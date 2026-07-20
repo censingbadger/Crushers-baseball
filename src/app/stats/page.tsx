@@ -97,7 +97,9 @@ export default async function StatsPage() {
         <h2 className="mb-2 text-lg font-bold">Batting</h2>
         {batters.length === 0 ? (
           <p className="text-sm text-neutral-600">
-            No batting stats yet — import GameChanger or enter a game below.
+            {isCoach
+              ? "No batting stats yet — import GameChanger or enter a game below."
+              : "No stats posted yet — they'll appear here once the coaches import GameChanger or enter a box score."}
           </p>
         ) : (
           <table className="w-full min-w-[640px] text-sm" style={{ fontVariantNumeric: "tabular-nums" }}>

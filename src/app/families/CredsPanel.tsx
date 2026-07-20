@@ -100,7 +100,7 @@ export function ResetButton({ userId, family }: { userId: string; family: string
   return (
     <span className="inline-flex items-center gap-2">
       <button
-        className="text-xs text-team-blue-dark underline"
+        className="btn px-2.5 py-1.5 text-xs text-team-blue-dark"
         disabled={pending}
         onClick={() =>
           startTransition(async () => {
@@ -190,6 +190,7 @@ export function AddFamilyForm({
 
 export function AddCoachForm() {
   const [cred, setCred] = useState<IssuedCredential | null>(null);
+  const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
   return (
     <form
@@ -198,7 +199,9 @@ export function AddCoachForm() {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
         startTransition(async () => {
-          setCred(await addCoach(fd));
+          const result = await addCoach(fd);
+          setCred(result);
+          setFailed(result === null);
         });
         e.currentTarget.reset();
       }}
@@ -214,6 +217,11 @@ export function AddCoachForm() {
       <button className="btn btn-blue" disabled={pending} type="submit">
         {pending ? "Adding…" : "Add coach"}
       </button>
+      {failed && (
+        <span className="text-sm font-semibold text-red-700">
+          Couldn&apos;t add — that email may already have an account.
+        </span>
+      )}
       {cred && (
         <span className="rounded border border-team-orange bg-paper px-2 py-1 text-sm">
           {cred.family}: <span className="font-mono font-bold">{cred.password}</span>{" "}

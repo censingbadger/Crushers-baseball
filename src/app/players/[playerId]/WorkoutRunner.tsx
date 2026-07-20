@@ -61,6 +61,14 @@ export function WorkoutRunner({
   const [logged, setLogged] = useState(false);
   const [pending, startTransition] = useTransition();
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  // Phones open the workout mid-page; snap the timer into view on start.
+  useEffect(() => {
+    if (phase === "running") {
+      cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [phase]);
 
   const start = (minutes: number) => {
     if (!Number.isFinite(minutes) || minutes < 1) return;
@@ -184,7 +192,7 @@ export function WorkoutRunner({
   const ss = String(Math.max(0, secondsLeft) % 60).padStart(2, "0");
 
   return (
-    <div className="text-center">
+    <div className="text-center" ref={cardRef} style={{ scrollMarginTop: 72 }}>
       <div className="mb-1 flex items-center justify-center gap-1.5">
         {plan.map((s, i) => (
           <span

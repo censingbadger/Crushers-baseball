@@ -244,9 +244,12 @@ await page.click("button:has-text('Approve & publish')");
 await page.waitForURL("**published=1**");
 await page.screenshot({ path: `${SHOTS}/13-report.png`, fullPage: true });
 
-// Drill library: coach loads the starter set (feeds guided workouts).
+// Drill library: seeded with the starter set (feeds guided workouts);
+// the one-click loader appears only on an empty library.
 await page.goto(BASE + "/drills");
-await page.click("button:has-text('Load starter drills')");
+if ((await page.locator("button:has-text('Load starter drills')").count()) > 0) {
+  await page.click("button:has-text('Load starter drills')");
+}
 await page.locator("text=Long toss").first().waitFor({ timeout: 15000 });
 
 // Family logins: generate for the seeded pending guardian, capture the
@@ -463,6 +466,14 @@ await page.fill("#email", "parent@demo.crushersblue.example");
 await page.fill("#password", "family-demo-2");
 await page.click("button[type=submit]");
 await page.waitForURL(BASE + "/");
+
+// Restore the seeded password so later suites (qa-sweep) can log in.
+await page.goto(BASE + "/account");
+await page.fill("#current", "family-demo-2");
+await page.fill("#next", "family-demo");
+await page.fill("#confirm", "family-demo");
+await page.click("button:has-text('Update password')");
+await page.waitForURL("**saved=password**");
 
 console.log("SMOKE OK");
 await browser.close();

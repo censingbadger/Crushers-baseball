@@ -20,7 +20,9 @@ function isoDateOf(d: Date): string {
 }
 
 const createSchema = z.object({
-  eventId: z.string().uuid(),
+  // Empty string = "quick game": we create a schedule event on the fly so
+  // the dugout works even when no game is on the calendar yet.
+  eventId: z.string().uuid().or(z.literal("")),
   label: z.string().trim().min(1).max(60),
   opponent: z.string().trim().max(80).optional(),
   innings: z.coerce.number().int().min(1).max(9),
@@ -29,15 +31,35 @@ const createSchema = z.object({
 export async function createGame(formData: FormData): Promise<void> {
   await requireCoach();
   const parsed = createSchema.safeParse({
-    eventId: formData.get("eventId"),
+    eventId: formData.get("eventId") ?? "",
     label: formData.get("label"),
     opponent: formData.get("opponent") || undefined,
     innings: formData.get("innings"),
   });
   if (!parsed.success) redirect("/games?error=1");
-  const { eventId, label, opponent, innings } = parsed.data;
+  const { label, opponent, innings } = parsed.data;
+  let { eventId } = parsed.data;
 
   const db = await getDb();
+  if (eventId === "") {
+    const [season] = await db
+      .select()
+      .from(tables.seasons)
+      .where(eq(tables.seasons.isActive, true))
+      .limit(1);
+    if (!season) redirect("/games?error=1");
+    const [quickEvent] = await db
+      .insert(tables.events)
+      .values({
+        seasonId: season.id,
+        type: "game",
+        title: label,
+        startsAt: new Date(),
+        opponent: opponent || null,
+      })
+      .returning();
+    eventId = quickEvent.id;
+  }
   const [event] = await db
     .select()
     .from(tables.events)
@@ -147,6 +169,42 @@ export async function setInning(gameId: string, inning: number): Promise<void> {
   if (!game) return;
   const clamped = Math.max(1, Math.min(9, Math.round(inning)));
   const db = await getDb();
+
+  // Extra innings: entering an inning that was never seeded (beyond the
+  // configured length) carries the previous alignment forward, so the
+  // field never silently empties.
+  const [hasAssignments] = await db
+    .select({ id: tables.gameAssignments.id })
+    .from(tables.gameAssignments)
+    .where(
+      and(
+        eq(tables.gameAssignments.gameId, gameId),
+        eq(tables.gameAssignments.inning, clamped),
+      ),
+    )
+    .limit(1);
+  if (!hasAssignments && clamped > 1) {
+    const previous = await db
+      .select()
+      .from(tables.gameAssignments)
+      .where(
+        and(
+          eq(tables.gameAssignments.gameId, gameId),
+          eq(tables.gameAssignments.inning, clamped - 1),
+        ),
+      );
+    if (previous.length > 0) {
+      await db.insert(tables.gameAssignments).values(
+        previous.map((a) => ({
+          gameId,
+          inning: clamped,
+          playerId: a.playerId,
+          position: a.position,
+        })),
+      );
+    }
+  }
+
   await db
     .update(tables.liveGames)
     .set({ currentInning: clamped, outs: 0 })
@@ -159,9 +217,10 @@ export async function cycleOuts(gameId: string): Promise<void> {
   const game = await loadGame(gameId);
   if (!game) return;
   const db = await getDb();
+  // 0 → 1 → 2 → 3 (shown) → 0: the third out is visible, not swallowed.
   await db
     .update(tables.liveGames)
-    .set({ outs: (game.outs + 1) % 3 })
+    .set({ outs: (game.outs + 1) % 4 })
     .where(eq(tables.liveGames.id, gameId));
   revalidatePath(`/game/${gameId}`);
 }

@@ -35,13 +35,20 @@ export default async function GamesPage() {
       <form action={createGame} className="card flex flex-wrap items-end gap-3 p-4">
         <div>
           <label className="label" htmlFor="eventId">Event</label>
-          <select className="field" id="eventId" name="eventId" required>
+          <select className="field" id="eventId" name="eventId">
             {events.map((e) => (
               <option key={e.id} value={e.id}>
                 {formatEventDate(e.startsAt)} · {e.title ?? EVENT_TYPE_LABEL[e.type]}
               </option>
             ))}
+            <option value="">⚡ Quick game right now (adds it to the schedule)</option>
           </select>
+          {events.length === 0 && (
+            <p className="mt-1 max-w-xs text-xs text-neutral-600">
+              No games or tournaments on the schedule yet — use the quick
+              game, or add one on the <Link className="underline" href="/schedule/new">Schedule page</Link>.
+            </p>
+          )}
         </div>
         <div>
           <label className="label" htmlFor="label">Game label</label>

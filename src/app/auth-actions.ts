@@ -11,11 +11,12 @@ import {
   SESSION_TTL_MS,
 } from "@/lib/session";
 
-async function issueSession(userId: string): Promise<void> {
+export async function issueSession(userId: string, epoch = 0): Promise<void> {
   const store = await cookies();
   store.set(SESSION_COOKIE, encodeSession({
     userId,
     expiresAt: Date.now() + SESSION_TTL_MS,
+    epoch,
   }), {
     httpOnly: true,
     sameSite: "lax",
@@ -42,7 +43,7 @@ export async function login(formData: FormData): Promise<void> {
     redirect("/login?error=invalid");
   }
 
-  await issueSession(user.id);
+  await issueSession(user.id, user.sessionEpoch);
   redirect("/");
 }
 

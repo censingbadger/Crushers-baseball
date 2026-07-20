@@ -7,6 +7,7 @@
  */
 import bcrypt from "bcryptjs";
 import { getDb, tables } from "./index";
+import { STARTER_DRILLS } from "../lib/drills";
 
 const DEMO_COACH = { email: "coach@demo.crushersblue.example", password: "dugout-demo" };
 const DEMO_PARENT = { email: "parent@demo.crushersblue.example", password: "family-demo" };
@@ -220,6 +221,12 @@ async function main() {
         status: (i + offset) % 4 === 0 ? "no" : (i + offset) % 7 === 0 ? "maybe" : "yes",
       });
     }
+  }
+
+  // The drill library ships loaded so the guided workout works out of
+  // the box for the demo team.
+  for (const drill of STARTER_DRILLS) {
+    await db.insert(tables.drills).values(drill);
   }
 
   // Player-page life for Milo: an avatar, a look, and a week of effort.

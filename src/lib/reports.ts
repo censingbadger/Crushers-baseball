@@ -39,7 +39,14 @@ export interface ReportContext {
   pitchingLine: string | null;
 }
 
-export const REPORT_MODEL = "claude-opus-4-8";
+// Preferred first — but not every Anthropic plan carries every model, so
+// drafting falls through this list on "model not available" errors.
+export const REPORT_MODELS = [
+  "claude-opus-4-8",
+  "claude-sonnet-5",
+  "claude-haiku-4-5",
+] as const;
+export const REPORT_MODEL = REPORT_MODELS[0];
 
 export function monthLabel(month: string): string {
   const [y, m] = month.split("-").map(Number);
@@ -344,6 +351,13 @@ function joinAnd(items: string[]): string {
  * deterministic template otherwise. Returns the text plus which drafter
  * produced it (stored on the report row).
  */
+/** Errors that mean "this model isn't on your plan" — worth falling back. */
+function modelUnavailable(err: unknown): boolean {
+  if (!(err instanceof Anthropic.APIError)) return false;
+  if (err.status === 404) return true;
+  return err.status === 403 && /model|not available|plan/i.test(err.message);
+}
+
 export async function draftReport(
   ctx: ReportContext,
 ): Promise<{ text: string; draftedBy: string }> {
@@ -352,18 +366,31 @@ export async function draftReport(
   }
   const client = new Anthropic();
   const { system, user } = buildReportPrompt(ctx);
-  const message = await client.messages.create({
-    model: REPORT_MODEL,
-    max_tokens: 2000,
-    thinking: { type: "adaptive" },
-    system,
-    messages: [{ role: "user", content: user }],
-  });
-  const text = message.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("\n")
-    .trim();
-  if (!text) throw new Error("The model returned an empty draft.");
-  return { text, draftedBy: REPORT_MODEL };
+  let lastError: unknown;
+  for (const model of REPORT_MODELS) {
+    try {
+      const message = await client.messages.create({
+        model,
+        max_tokens: 2000,
+        ...(model === "claude-haiku-4-5" ? {} : { thinking: { type: "adaptive" as const } }),
+        system,
+        messages: [{ role: "user", content: user }],
+      });
+      const text = message.content
+        .filter((block): block is Anthropic.TextBlock => block.type === "text")
+        .map((block) => block.text)
+        .join("\n")
+        .trim();
+      if (!text) throw new Error("The model returned an empty draft.");
+      return { text, draftedBy: model };
+    } catch (err) {
+      lastError = err;
+      if (modelUnavailable(err)) continue; // try the next tier
+      throw err;
+    }
+  }
+  // No model on this plan could draft — fall back to the template rather
+  // than dead-ending the coach.
+  console.error("all report models unavailable:", lastError);
+  return { text: templateDraft(ctx), draftedBy: "template" };
 }
