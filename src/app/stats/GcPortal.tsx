@@ -91,10 +91,12 @@ export function GcPortal() {
             Sign in at <b>web.gc.com</b> on a computer and open your team.
           </li>
           <li>
-            Go to <b>Stats</b>, pick the season view, and use <b>Export</b> on
-            each tab you want — batting, pitching, fielding, catching.
+            Go to <b>Stats</b> and hit <b>Export Stats</b>. The website gives
+            one wide file with batting, pitching, and fielding/catching all in
+            it — <b>that single file fills all four tables here</b>. (Older
+            per-category exports work too, together or one at a time.)
           </li>
-          <li>Drag all the files onto the zone above (together is fine).</li>
+          <li>Drag the file onto the zone above.</li>
         </ol>
         <p className="mt-1 text-neutral-700">
           On a phone: export from the GC app via share → save to Files, then

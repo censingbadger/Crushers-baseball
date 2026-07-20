@@ -53,6 +53,9 @@ await page.screenshot({ path: `${SHOTS}/02-dashboard.png`, fullPage: true });
 await page.goto(BASE + "/roster");
 const rosterText = await page.textContent("main");
 if (!rosterText?.includes("Perry Vance")) fail("coach roster missing guardian contact");
+// Every row carries an explicit edit affordance for coaches.
+if ((await page.locator("tbody a:has-text('Edit')").count()) === 0)
+  fail("roster rows missing the Edit button");
 await page.screenshot({ path: `${SHOTS}/03-roster.png`, fullPage: true });
 
 // Availability grids render, with the weekend planner rollup.
@@ -319,6 +322,29 @@ if (!statsText?.includes("2.57")) fail(`ERA not derived (expected 2.57)`);
 await page.screenshot({ path: `${SHOTS}/12-stats.png`, fullPage: true });
 void statRow;
 
+// GameChanger portal, combined web export: ONE wide file (banner row +
+// every section side by side) fills all four tables. Non-players' all-zero
+// section rows are dropped, so pitching/catching count only Milo.
+const gcCombined = [
+  ",,,Batting,,,,,,,,,,,,,Pitching,,,,,,,,,,,Fielding,,,,,,,,,,,,",
+  "Number,Last,First,GP,AB,H,2B,3B,HR,RBI,R,BB,SO,SB,HBP,SF,IP,GP,BF,#P,H,R,ER,BB,SO,ERA,WHIP,TC,A,PO,FPCT,E,DP,INN,PB,SB,SBATT,CS,CS%",
+  "1,Vance,Milo,2,4,2,1,0,0,3,2,1,1,1,0,0,1.2,1,8,30,2,1,1,2,3,4.20,1.80,5,2,3,1.000,0,1,3.0,1,2,3,1,33.3",
+  "2,Brooks,Eli,2,3,1,0,0,0,0,1,0,2,0,0,0,0.0,0,0,0,0,0,0,0,0,-,-,2,0,1,.500,1,0,0.0,0,0,0,0,-",
+  "Totals,,,2,7,3,1,0,0,3,3,1,3,1,0,0,1.2,1,8,30,2,1,1,2,3,4.20,1.80,7,2,4,.857,1,1,3.0,1,2,3,1,33.3",
+  "Glossary,,,GP = Games played,AB = At bats,H = Hits",
+].join("\n");
+await page.locator("[data-testid=gc-portal] input[type=file]").setInputFiles([
+  { name: "combined.csv", mimeType: "text/csv", buffer: Buffer.from(gcCombined) },
+]);
+await page.locator("[data-testid=gc-result]").waitFor({ timeout: 20000 });
+const gcCombinedResult = await page.textContent("[data-testid=gc-result]");
+if (!gcCombinedResult?.includes("combined export"))
+  fail(`gc combined drop not recognized: ${gcCombinedResult}`);
+if (!gcCombinedResult?.match(/2 batting/)) fail("gc combined batting count off");
+if (!gcCombinedResult?.match(/1 pitching/)) fail("gc combined pitching count off");
+if (!gcCombinedResult?.match(/2 fielding/)) fail("gc combined fielding count off");
+if (!gcCombinedResult?.match(/1 catching/)) fail("gc combined catching count off");
+
 // GameChanger portal: drop batting + pitching CSVs together; the server
 // sniffs which is which and imports both as the replaceable GC snapshot.
 const gcBatting = [
@@ -340,7 +366,10 @@ await page.locator("[data-testid=gc-portal] input[type=file]").setInputFiles([
   { name: "fielding.csv", mimeType: "text/csv", buffer: Buffer.from(gcFielding) },
   { name: "catching.csv", mimeType: "text/csv", buffer: Buffer.from(gcCatching) },
 ]);
-await page.locator("[data-testid=gc-result]").waitFor({ timeout: 20000 });
+// The combined result is still on screen — wait for THIS drop's summary.
+await page
+  .locator("[data-testid=gc-result] p:has-text('batting.csv')")
+  .waitFor({ timeout: 20000 });
 const gcResult = await page.textContent("[data-testid=gc-result]");
 if (!gcResult?.match(/2 batting lines/)) fail(`gc portal batting import off: ${gcResult}`);
 if (!gcResult?.match(/1 pitching lines/)) fail("gc portal pitching import off");

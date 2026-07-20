@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { detectGcKind, parseGameChangerCsv } from "./gamechanger";
+import {
+  detectGcKind,
+  dropZeroLines,
+  parseGameChangerCsv,
+  splitGcCombined,
+} from "./gamechanger";
 
 // Synthetic fixtures shaped like GameChanger season exports. Fictional names.
 const ROSTER = [
@@ -132,5 +137,80 @@ describe("parseGameChangerCsv — fielding & catching", () => {
     expect(lines).toHaveLength(1);
     // 21.2 innings = 21*3 + 2 = 65 outs.
     expect(lines[0].stats).toMatchObject({ outs: 65, pb: 3, sbAllowed: 7, cs: 4 });
+  });
+});
+
+// The GC website's combined "Export Stats" file: banner row marking the
+// Batting / Pitching / Fielding sections, one wide header row, shared
+// Number/Last/First columns, Totals + Glossary tail. Milo pitched and
+// caught; Eli did neither (his sections are the all-zero filler rows the
+// real export carries for every kid).
+const COMBINED_ROSTER = [
+  { id: "p-milo", firstName: "Milo", lastName: "Vance" },
+  { id: "p-eli", firstName: "Eli", lastName: "Brooks" },
+];
+
+const COMBINED = [
+  ",,,Batting,,,,,,,,,,,,,Pitching,,,,,,,,,,,Fielding,,,,,,,,,,,,",
+  "Number,Last,First,GP,AB,H,2B,3B,HR,RBI,R,BB,SO,SB,HBP,SF,IP,GP,BF,#P,H,R,ER,BB,SO,ERA,WHIP,TC,A,PO,FPCT,E,DP,INN,PB,SB,SBATT,CS,CS%",
+  "1,Vance,Milo,2,4,2,1,0,0,3,2,1,1,1,0,0,1.2,1,8,30,2,1,1,2,3,4.20,1.80,5,2,3,1.000,0,1,3.0,1,2,3,1,33.3",
+  "2,Brooks,Eli,2,3,1,0,0,0,0,1,0,2,0,0,0,0.0,0,0,0,0,0,0,0,0,-,-,2,0,1,.500,1,0,0.0,0,0,0,0,-",
+  "Totals,,,2,7,3,1,0,0,3,3,1,3,1,0,0,1.2,1,8,30,2,1,1,2,3,4.20,1.80,7,2,4,.857,1,1,3.0,1,2,3,1,33.3",
+  "Glossary,,,GP = Games played,AB = At bats,H = Hits",
+].join("\n");
+
+describe("splitGcCombined", () => {
+  it("returns null for a plain per-kind export", () => {
+    expect(splitGcCombined(BATTING_CSV)).toBeNull();
+    expect(splitGcCombined(PITCHING_CSV)).toBeNull();
+  });
+
+  it("splits the combined export into all four kinds", () => {
+    const parts = splitGcCombined(COMBINED);
+    expect(parts).not.toBeNull();
+    expect(Object.keys(parts!).sort()).toEqual([
+      "batting",
+      "catching",
+      "fielding",
+      "pitching",
+    ]);
+  });
+
+  it("batting section parses with the shared name columns", () => {
+    const parts = splitGcCombined(COMBINED)!;
+    const res = parseGameChangerCsv(parts.batting!, "batting", COMBINED_ROSTER);
+    expect(res.lines).toHaveLength(2);
+    const milo = res.lines.find((l) => l.playerId === "p-milo")!;
+    expect(milo.stats).toMatchObject({ ab: 4, h: 2, doubles: 1, rbi: 3, sb: 1 });
+  });
+
+  it("pitching section keeps its own columns, split away from batting's twins", () => {
+    const parts = splitGcCombined(COMBINED)!;
+    const res = parseGameChangerCsv(parts.pitching!, "pitching", COMBINED_ROSTER);
+    const milo = res.lines.find((l) => l.playerId === "p-milo")!;
+    expect(milo.stats).toMatchObject({ outs: 5, bf: 8, pitches: 30, er: 1, k: 3 });
+  });
+
+  it("catching lines come out of the fielding section", () => {
+    const parts = splitGcCombined(COMBINED)!;
+    const res = parseGameChangerCsv(parts.catching!, "catching", COMBINED_ROSTER);
+    const milo = res.lines.find((l) => l.playerId === "p-milo")!;
+    // INN 3.0 → 9 outs caught; SB here is stolen bases ALLOWED.
+    expect(milo.stats).toMatchObject({ outs: 9, pb: 1, sbAllowed: 2, cs: 1 });
+  });
+
+  it("fielding chances parse per player", () => {
+    const parts = splitGcCombined(COMBINED)!;
+    const res = parseGameChangerCsv(parts.fielding!, "fielding", COMBINED_ROSTER);
+    const eli = res.lines.find((l) => l.playerId === "p-eli")!;
+    expect(eli.stats).toMatchObject({ po: 1, a: 0, e: 1, dp: 0 });
+  });
+});
+
+describe("dropZeroLines", () => {
+  it("drops the all-zero roster filler rows the combined export carries", () => {
+    const parts = splitGcCombined(COMBINED)!;
+    const res = parseGameChangerCsv(parts.pitching!, "pitching", COMBINED_ROSTER);
+    expect(dropZeroLines(res.lines).map((l) => l.playerId)).toEqual(["p-milo"]);
   });
 });

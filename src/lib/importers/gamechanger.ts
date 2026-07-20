@@ -121,6 +121,71 @@ export function detectGcKind(csv: string): GcKind | null {
   return best.kind;
 }
 
+/**
+ * GameChanger's website "Export Stats" is ONE wide CSV holding every
+ * category: a banner row marks where the Batting / Pitching / Fielding
+ * sections start, the next row carries ~200 headers (names repeat across
+ * sections), and Number/Last/First sit to the left of the first section.
+ * The Fielding section also carries the catching columns (INN, PB, SB,
+ * SBATT, CS). Split it into per-kind sub-CSVs that the per-kind parser
+ * already understands; returns null when the file isn't this format.
+ */
+export function splitGcCombined(csv: string): Partial<Record<GcKind, string>> | null {
+  const grid = Papa.parse<string[]>(csv.replace(/^﻿/, "").trim(), {
+    skipEmptyLines: true,
+  }).data;
+  let bat = -1;
+  let pit = -1;
+  let fld = -1;
+  let bannerIdx = -1;
+  for (let i = 0; i < Math.min(grid.length, 3); i++) {
+    const cells = grid[i].map(norm);
+    const b = cells.indexOf("batting");
+    const p = cells.indexOf("pitching");
+    if (b >= 0 && p > b) {
+      bannerIdx = i;
+      bat = b;
+      pit = p;
+      fld = cells.indexOf("fielding");
+      break;
+    }
+  }
+  if (bannerIdx === -1 || bannerIdx + 1 >= grid.length || bat === 0) return null;
+
+  // Header + data rows (the Totals and Glossary tails fall out naturally:
+  // the parser skips rows without a player name).
+  const rows = grid.slice(bannerIdx + 1);
+  const width = Math.max(...rows.map((r) => r.length));
+  const nameCols = Array.from({ length: bat }, (_, c) => c);
+  const section = (start: number, end: number): string =>
+    Papa.unparse(
+      rows.map((r) => [
+        ...nameCols.map((c) => r[c] ?? ""),
+        ...Array.from({ length: end - start }, (_, k) => r[start + k] ?? ""),
+      ]),
+    );
+
+  const out: Partial<Record<GcKind, string>> = {
+    batting: section(bat, pit),
+    pitching: section(pit, fld >= 0 ? fld : width),
+  };
+  if (fld >= 0) {
+    const fieldingCsv = section(fld, width);
+    out.fielding = fieldingCsv;
+    out.catching = fieldingCsv; // catching columns live inside this section
+  }
+  return out;
+}
+
+/**
+ * Drop lines where every stored stat is zero — the combined export lists
+ * the whole roster in every section, so non-pitchers show up as all-zero
+ * pitching rows that would only be noise in the tables.
+ */
+export function dropZeroLines(lines: GcLine[]): GcLine[] {
+  return lines.filter((l) => Object.values(l.stats).some((v) => v !== 0));
+}
+
 export function parseGameChangerCsv(
   csv: string,
   kind: GcKind,
