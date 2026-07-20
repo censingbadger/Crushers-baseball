@@ -467,6 +467,14 @@ await page.fill("#password", "family-demo-2");
 await page.click("button[type=submit]");
 await page.waitForURL(BASE + "/");
 
+// Restore the seeded password so later suites (qa-sweep) can log in.
+await page.goto(BASE + "/account");
+await page.fill("#current", "family-demo-2");
+await page.fill("#next", "family-demo");
+await page.fill("#confirm", "family-demo");
+await page.click("button:has-text('Update password')");
+await page.waitForURL("**saved=password**");
+
 console.log("SMOKE OK");
 await browser.close();
 process.exit(0);
