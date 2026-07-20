@@ -2,6 +2,13 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getActiveSeason, getGuardiansByPlayer, getRoster } from "@/lib/data";
 import { formatIsoDay } from "@/lib/format";
+import {
+  getBlendedRatingsByPlayer,
+  getSeasonBattingByPlayer,
+  getSeasonPitchingByPlayer,
+  topPositions,
+} from "@/lib/performance";
+import { battingRates, formatIp } from "@/lib/stats";
 
 export default async function RosterPage() {
   const user = await requireUser();
@@ -14,6 +21,14 @@ export default async function RosterPage() {
   const guardians = isCoach
     ? await getGuardiansByPlayer(roster.map((r) => r.playerId))
     : null;
+  // The one-stop columns: coach ratings + GameChanger season stats.
+  const [blended, batting, pitching] = isCoach
+    ? await Promise.all([
+        getBlendedRatingsByPlayer(season.id),
+        getSeasonBattingByPlayer(season.id),
+        getSeasonPitchingByPlayer(season.id),
+      ])
+    : [null, null, null];
 
   return (
     <div className="space-y-4">
@@ -26,13 +41,15 @@ export default async function RosterPage() {
         )}
       </div>
       <div className="card overflow-x-auto p-4">
-        <table className="w-full min-w-[480px] text-sm">
+        <table className="w-full min-w-[560px] text-sm sm:min-w-[840px]">
           <thead>
             <tr className="border-b border-line-strong text-left">
               <th className="py-1 pr-2">#</th>
               <th className="py-1 pr-2">Player</th>
               <th className="py-1 pr-2">Status</th>
               <th className="py-1 pr-2">Positions</th>
+              {isCoach && <th className="py-1 pr-2">Rated best at</th>}
+              {isCoach && <th className="py-1 pr-2">Season bat / arm</th>}
               {isCoach && <th className="py-1 pr-2">Birthdate</th>}
               {isCoach && <th className="py-1 pr-2">School</th>}
               {isCoach && <th className="py-1">Parents / guardians</th>}
@@ -71,6 +88,40 @@ export default async function RosterPage() {
                   )}
                 </td>
                 <td className="py-1.5 pr-2">{p.positions ?? "—"}</td>
+                {isCoach && (
+                  <td className="whitespace-nowrap py-1.5 pr-2">
+                    {topPositions(blended?.get(p.playerId)).map((t) => (
+                      <span
+                        key={t.position}
+                        className="mr-1 rounded border border-line bg-team-blue-light px-1 py-0.5 text-xs font-bold"
+                      >
+                        {t.position} {t.rating}
+                      </span>
+                    ))}
+                    {topPositions(blended?.get(p.playerId)).length === 0 && (
+                      <span className="text-xs text-neutral-500">unrated</span>
+                    )}
+                  </td>
+                )}
+                {isCoach && (
+                  <td className="whitespace-nowrap py-1.5 pr-2 text-xs">
+                    {(() => {
+                      const b = batting?.get(p.playerId);
+                      const arm = pitching?.get(p.playerId);
+                      const avg = b ? battingRates(b).avg : null;
+                      return (
+                        <>
+                          {avg !== null && avg !== undefined
+                            ? `${String(avg.toFixed(3)).replace(/^0/, "")} avg`
+                            : "no ABs"}
+                          {arm && arm.outs > 0 && (
+                            <span className="text-neutral-600"> · {formatIp(arm.outs)} IP</span>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </td>
+                )}
                 {isCoach && (
                   <td className="py-1.5 pr-2">
                     {p.birthdate ? formatIsoDay(p.birthdate) : "—"}

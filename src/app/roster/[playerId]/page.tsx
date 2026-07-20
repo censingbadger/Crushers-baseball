@@ -12,6 +12,13 @@ import {
   toggleNoteShared,
 } from "@/app/roster/development-actions";
 import { DIMENSIONS, dimensionTrend } from "@/lib/development";
+import { POSITIONS } from "@/db/schema";
+import {
+  getBlendedRatingsByPlayer,
+  getSeasonBattingByPlayer,
+  getSeasonPitchingByPlayer,
+} from "@/lib/performance";
+import { battingRates, formatIp, pitchingRates } from "@/lib/stats";
 
 const TREND_ARROW = { up: "↗", down: "↘", flat: "→" } as const;
 
@@ -81,11 +88,81 @@ export default async function PlayerEditPage({
     .where(eq(tables.devNotes.playerId, playerId))
     .orderBy(asc(tables.devNotes.createdAt));
 
+  // One-stop performance: blended matrix ratings + GameChanger season line.
+  const [matrix, battingTotals, pitchingTotals] = season
+    ? await Promise.all([
+        getBlendedRatingsByPlayer(season.id).then((m) => m.get(playerId)),
+        getSeasonBattingByPlayer(season.id).then((m) => m.get(playerId)),
+        getSeasonPitchingByPlayer(season.id).then((m) => m.get(playerId)),
+      ])
+    : [undefined, undefined, undefined];
+  const bat = battingTotals ? battingRates(battingTotals) : null;
+  const arm = pitchingTotals ? pitchingRates(pitchingTotals) : null;
+
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <h1 className="text-2xl font-extrabold">
         Edit {player.firstName} {player.lastName}
       </h1>
+
+      <div className="card p-4">
+        <div className="mb-1 flex items-baseline justify-between">
+          <h2 className="font-bold">Performance at a glance</h2>
+          <span className="text-xs text-neutral-500">
+            <Link className="underline" href="/matrix">matrix</Link>
+            {" · "}
+            <Link className="underline" href="/stats">stats</Link>
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {matrix ? (
+            POSITIONS.map((pos) => {
+              const r = matrix.get(pos);
+              return (
+                <span
+                  key={pos}
+                  className={`rounded border border-line px-1.5 py-0.5 text-xs font-bold ${
+                    r === undefined
+                      ? "text-neutral-400"
+                      : r >= 8
+                        ? "bg-team-orange text-paper"
+                        : r >= 6
+                          ? "bg-team-blue"
+                          : r >= 4
+                            ? "bg-team-blue-light"
+                            : ""
+                  }`}
+                >
+                  {pos} {r ?? "·"}
+                </span>
+              );
+            })
+          ) : (
+            <span className="text-sm text-neutral-500">
+              No matrix ratings yet — rate on the matrix page.
+            </span>
+          )}
+        </div>
+        <p className="mt-2 text-sm">
+          {battingTotals && bat ? (
+            <>
+              <b>Batting</b>: {bat.avg !== null ? bat.avg.toFixed(3).replace(/^0/, "") : "—"} avg
+              {bat.ops !== null && <> · {bat.ops.toFixed(3).replace(/^0/, "")} ops</>}
+              {" · "}
+              {battingTotals.h} H / {battingTotals.ab} AB · {battingTotals.rbi} RBI
+            </>
+          ) : (
+            <span className="text-neutral-500">No batting stats imported yet.</span>
+          )}
+        </p>
+        {pitchingTotals && arm && pitchingTotals.outs > 0 && (
+          <p className="text-sm">
+            <b>Pitching</b>: {formatIp(pitchingTotals.outs)} IP · {pitchingTotals.k} K ·{" "}
+            {arm.era !== null ? `${arm.era.toFixed(2)} ERA` : ""}
+            {arm.whip !== null && <> · {arm.whip.toFixed(2)} WHIP</>}
+          </p>
+        )}
+      </div>
 
       <form action={updatePlayer} className="card space-y-3 p-4">
         <input type="hidden" name="playerId" value={player.id} />
