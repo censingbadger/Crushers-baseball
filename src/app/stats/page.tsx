@@ -19,6 +19,9 @@ import {
   pitchingRates,
 } from "@/lib/stats";
 import { formatIsoDay } from "@/lib/format";
+import { computeSeasonUsage } from "@/lib/usage";
+import { getRecentPitchDays } from "@/lib/home";
+import { pitchEligibility } from "@/lib/pitchsmart";
 import { GcPortal } from "./GcPortal";
 import { createStatGame, deleteStatGame } from "./actions";
 
@@ -119,6 +122,45 @@ export default async function StatsPage() {
     })
     .sort((a, b) => b.totals.outs - a.totals.outs);
   const isCoach = user.role === "coach";
+
+  // The fairness ledger + pitcher availability, from dugout game records.
+  let usage: ReturnType<typeof computeSeasonUsage> = new Map();
+  let pitchStatus: { playerId: string; last7: number; note: string }[] = [];
+  if (isCoach) {
+    const liveGames = await db
+      .select()
+      .from(tables.liveGames)
+      .where(eq(tables.liveGames.seasonId, season.id));
+    const liveIds = liveGames.map((g) => g.id);
+    const assignmentRows = liveIds.length
+      ? await db
+          .select()
+          .from(tables.gameAssignments)
+          .where(inArray(tables.gameAssignments.gameId, liveIds))
+      : [];
+    usage = computeSeasonUsage(liveGames, assignmentRows);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const since = new Date(Date.now() - 6 * 86400_000).toISOString().slice(0, 10);
+    const pitchDays = await getRecentPitchDays(season.id, since);
+    const byPlayer = new Map<string, { day: string; pitches: number }[]>();
+    for (const d of pitchDays) {
+      byPlayer.set(d.playerId, [...(byPlayer.get(d.playerId) ?? []), d]);
+    }
+    pitchStatus = [...byPlayer.entries()].map(([playerId, days]) => {
+      const e = pitchEligibility(days, today);
+      return {
+        playerId,
+        last7: days.reduce((n, d) => n + d.pitches, 0),
+        note: e.eligible
+          ? `OK · ${e.pitchesRemainingToday} left today`
+          : e.nextEligibleDay
+            ? `resting — back ${formatIsoDay(e.nextEligibleDay)}`
+            : "at the daily cap",
+      };
+    });
+  }
+  const nameOf = new Map(roster.map((p) => [p.playerId, `${p.firstName} ${p.lastName}`]));
 
   return (
     <div className="space-y-6">
@@ -284,6 +326,88 @@ export default async function StatsPage() {
                   <td className="px-1.5 font-extrabold text-team-blue-dark">{fmt3(rates.csPct)}</td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {isCoach && usage.size > 0 && (
+        <section className="card overflow-x-auto p-4">
+          <h2 className="mb-1 text-lg font-bold">Playing time (season)</h2>
+          <p className="mb-2 text-xs text-neutral-600">
+            Rolled up from every dugout game — the receipts when someone asks
+            about innings. Sat% is bench share of innings present.
+          </p>
+          <table className="w-full min-w-[520px] text-sm" style={{ fontVariantNumeric: "tabular-nums" }}>
+            <thead>
+              <tr className="border-b border-line-strong text-right">
+                <th className="py-1 text-left">Player</th>
+                <th className="px-1.5">G</th>
+                <th className="px-1.5">Inn played</th>
+                <th className="px-1.5">Inn sat</th>
+                <th className="px-1.5 font-extrabold">Sat%</th>
+                <th className="py-1 pl-3 text-left">Where they played</th>
+              </tr>
+            </thead>
+            <tbody>
+              {roster
+                .filter((p) => usage.has(p.playerId))
+                .map((p) => usage.get(p.playerId)!)
+                .sort((a, b) => (b.satShare ?? 0) - (a.satShare ?? 0))
+                .map((u) => (
+                  <tr key={u.playerId} className="border-b border-line text-right">
+                    <td className="py-1 text-left font-semibold">{nameOf.get(u.playerId)}</td>
+                    <td className="px-1.5">{u.games}</td>
+                    <td className="px-1.5">{u.fieldInnings}</td>
+                    <td className="px-1.5">{u.benchInnings}</td>
+                    <td
+                      className={`px-1.5 font-extrabold ${
+                        (u.satShare ?? 0) >= 0.4 ? "text-red-700" : "text-team-blue-dark"
+                      }`}
+                    >
+                      {u.satShare === null ? "—" : `${Math.round(u.satShare * 100)}%`}
+                    </td>
+                    <td className="py-1 pl-3 text-left text-xs">
+                      {u.positions.map(([pos, n]) => `${pos} ${n}`).join(" · ") || "—"}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {isCoach && pitchStatus.length > 0 && (
+        <section className="card overflow-x-auto p-4">
+          <h2 className="mb-1 text-lg font-bold">Pitching — last 7 days</h2>
+          <p className="mb-2 text-xs text-neutral-600">
+            Pitch Smart across the week: who&apos;s fresh for the weekend, who
+            needs rest. Plan Sunday&apos;s arms backward from here.
+          </p>
+          <table className="w-full min-w-[380px] text-sm" style={{ fontVariantNumeric: "tabular-nums" }}>
+            <thead>
+              <tr className="border-b border-line-strong text-right">
+                <th className="py-1 text-left">Pitcher</th>
+                <th className="px-1.5">Pitches (7d)</th>
+                <th className="py-1 pl-3 text-left">Today</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pitchStatus
+                .sort((a, b) => b.last7 - a.last7)
+                .map((s) => (
+                  <tr key={s.playerId} className="border-b border-line text-right">
+                    <td className="py-1 text-left font-semibold">{nameOf.get(s.playerId)}</td>
+                    <td className="px-1.5">{s.last7}</td>
+                    <td
+                      className={`py-1 pl-3 text-left text-xs font-bold ${
+                        s.note.startsWith("OK") ? "text-green-700" : "text-red-700"
+                      }`}
+                    >
+                      {s.note}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </section>

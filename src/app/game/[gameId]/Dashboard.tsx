@@ -120,6 +120,8 @@ interface Props {
   ratingsByPlayer: Record<string, Record<string, number>>;
   /** playerId -> positions the kid's aspirations name (e.g. ["SS","P"]). */
   aspiringByPlayer: Record<string, string[]>;
+  /** playerId -> season bench share (0..1) — the fairness number. */
+  seasonSatShareByPlayer: Record<string, number>;
   score: { inning: number; side: "us" | "them"; runs: number }[];
   battingOrder: { playerId: string; spot: number }[];
 }
@@ -518,6 +520,8 @@ export function Dashboard(props: Props) {
                   {!board && (
                     <span className="ml-1 text-[11px] font-semibold opacity-70">
                       {props.benchInningsByPlayer[pid] ?? 0} inn sat
+                      {props.seasonSatShareByPlayer[pid] !== undefined &&
+                        ` · szn ${Math.round(props.seasonSatShareByPlayer[pid] * 100)}%`}
                     </span>
                   )}
                   {!board && !eligibility[pid]?.eligible && (

@@ -151,9 +151,15 @@ export default async function HomePage() {
                 {isCoach ? "Event details" : "Details & RSVP"}
               </Link>
               {isCoach && next.type === "practice" && (
-                <Link className="btn px-4 py-1.5 text-sm" href="/drills">
-                  Drill library
-                </Link>
+                <>
+                  {/* Practice night's habit: log feedback while it's fresh. */}
+                  <Link className="btn px-4 py-1.5 text-sm" href="/rate">
+                    Log feedback
+                  </Link>
+                  <Link className="btn px-4 py-1.5 text-sm" href="/drills">
+                    Drill library
+                  </Link>
+                </>
               )}
               <Link className="btn px-4 py-1.5 text-sm" href="/schedule">
                 Full schedule

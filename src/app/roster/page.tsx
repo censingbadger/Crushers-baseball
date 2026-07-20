@@ -19,7 +19,8 @@ import {
 } from "@/lib/stats";
 import { POSITIONS } from "@/db/schema";
 import { DIMENSIONS, dimensionTrend } from "@/lib/development";
-import { eq } from "drizzle-orm";
+import { computeSeasonUsage, type PlayerUsage } from "@/lib/usage";
+import { eq, inArray } from "drizzle-orm";
 import { getDb, tables } from "@/db";
 
 export default async function RosterPage() {
@@ -47,6 +48,24 @@ export default async function RosterPage() {
           .where(eq(tables.playerRatings.seasonId, season.id)),
       ])
     : [null, null, null, null, null, null];
+
+  // Season playing-time ledger from the dugout's game records.
+  let usage: ReturnType<typeof computeSeasonUsage> = new Map();
+  if (isCoach) {
+    const db = await getDb();
+    const liveGames = await db
+      .select()
+      .from(tables.liveGames)
+      .where(eq(tables.liveGames.seasonId, season.id));
+    const liveIds = liveGames.map((g) => g.id);
+    const assignmentRows = liveIds.length
+      ? await db
+          .select()
+          .from(tables.gameAssignments)
+          .where(inArray(tables.gameAssignments.gameId, liveIds))
+      : [];
+    usage = computeSeasonUsage(liveGames, assignmentRows);
+  }
 
   // Latest feedback score + trend per dimension per player.
   const feedbackByPlayer = new Map<
@@ -117,6 +136,7 @@ export default async function RosterPage() {
                 fielding={fielding?.get(p.playerId)}
                 catching={catching?.get(p.playerId)}
                 feedback={feedbackByPlayer.get(p.playerId)}
+                usage={usage.get(p.playerId)}
               />
             ))}
           </tbody>
@@ -141,6 +161,7 @@ function RosterRow({
   fielding,
   catching,
   feedback,
+  usage,
 }: {
   p: Awaited<ReturnType<typeof getRoster>>[number];
   isCoach: boolean;
@@ -151,6 +172,7 @@ function RosterRow({
   fielding: Parameters<typeof fieldingRates>[0] | undefined;
   catching: Parameters<typeof catchingRates>[0] | undefined;
   feedback: { key: string; label: string; latest: number; arrow: string }[] | undefined;
+  usage: PlayerUsage | undefined;
 }) {
   const bat = batting ? battingRates(batting) : null;
   const arm = pitching ? pitchingRates(pitching) : null;
@@ -308,6 +330,20 @@ function RosterRow({
                     {catching && behind && catching.outs > 0
                       ? `${formatIp(catching.outs)} INN · ${catching.pb} PB · CS ${fmt(behind.csPct)}`
                       : "no catching data yet"}
+                  </p>
+                  <p>
+                    <b>Playing time</b>:{" "}
+                    {usage
+                      ? `${usage.games} G · ${usage.fieldInnings} inn played · ${usage.benchInnings} sat${
+                          usage.satShare !== null
+                            ? ` (${Math.round(usage.satShare * 100)}%)`
+                            : ""
+                        }${
+                          usage.positions.length > 0
+                            ? ` · ${usage.positions.map(([pos, n]) => `${pos} ${n}`).join(", ")}`
+                            : ""
+                        }`
+                      : "no dugout games yet"}
                   </p>
                 </div>
               </div>
