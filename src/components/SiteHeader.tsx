@@ -2,32 +2,61 @@ import Image from "next/image";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { logout } from "@/app/auth-actions";
-import { NavLinks, type NavItem } from "@/components/NavLinks";
+import { NavLinks, type NavEntry, type NavItem } from "@/components/NavLinks";
 
-const EVERYONE: NavItem[] = [
+const TEAM: NavItem[] = [
   { href: "/schedule", label: "Schedule" },
   { href: "/roster", label: "Roster" },
   { href: "/players", label: "Players" },
   { href: "/availability", label: "Availability" },
+];
+
+const PROGRESS: NavItem[] = [
   { href: "/progress", label: "Progress" },
   { href: "/stats", label: "Stats" },
 ];
 
-const COACH: NavItem[] = [
+const SETTINGS: NavEntry = { href: "/account", label: "Settings", mobileOnly: true };
+
+const PARENT_ENTRIES: NavEntry[] = [
+  { label: "Team", items: TEAM },
+  { label: "Progress", items: PROGRESS },
+  SETTINGS,
+];
+
+const COACH_ENTRIES: NavEntry[] = [
+  { label: "Team", items: TEAM },
   { href: "/games", label: "Game day", accent: true },
-  { href: "/rate", label: "Rate" },
-  { href: "/reports", label: "Reports" },
-  { href: "/matrix", label: "Matrix" },
-  { href: "/lineup", label: "Lineup" },
-  { href: "/weekend", label: "Weekend" },
-  { href: "/drills", label: "Drills" },
-  { href: "/families", label: "Admin" },
-  { href: "/import", label: "Import" },
+  {
+    label: "Progress",
+    items: [
+      ...PROGRESS,
+      { href: "/rate", label: "Rate" },
+      { href: "/matrix", label: "Matrix" },
+      { href: "/reports", label: "Reports" },
+    ],
+  },
+  {
+    label: "Planning",
+    items: [
+      { href: "/lineup", label: "Lineup" },
+      { href: "/weekend", label: "Weekend" },
+      { href: "/drills", label: "Drills" },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [
+      { href: "/families", label: "Families" },
+      { href: "/import", label: "Import" },
+    ],
+  },
+  SETTINGS,
 ];
 
 export async function SiteHeader() {
   const user = await getCurrentUser();
-  const items = user?.role === "coach" ? [...EVERYONE, ...COACH] : EVERYONE;
+  const entries = user?.role === "coach" ? COACH_ENTRIES : PARENT_ENTRIES;
   return (
     <header className="sticky top-0 z-40 border-b border-team-blue-dark/25 bg-gradient-to-b from-[#a8d4f0] to-team-blue shadow-[0_2px_14px_rgb(23_42_58_/_0.12)] backdrop-blur">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2.5">
@@ -66,10 +95,8 @@ export async function SiteHeader() {
               </form>
             </div>
             {/* On phones the nav collapses behind ☰ (Settings moves inside);
-                from sm up it's the familiar inline pill row. */}
-            <NavLinks
-              items={[...items, { href: "/account", label: "Settings", mobileOnly: true }]}
-            />
+                from sm up groups open as dropdowns from the pill row. */}
+            <NavLinks entries={entries} />
           </>
         )}
       </div>

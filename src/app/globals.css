@@ -45,6 +45,13 @@ h1 {
   text-transform: uppercase;
 }
 
+/*
+ * Component classes live in the `components` layer so Tailwind utilities
+ * (which sit in the later `utilities` layer) can override them — e.g.
+ * `btn px-2.5 py-1` for compact buttons or `btn sm:hidden` for the phone
+ * menu toggle. Unlayered rules would silently beat every utility.
+ */
+@layer components {
 /* The app's signature surface: clean white card, hairline edge, soft lift. */
 .card {
   background: var(--color-paper);
@@ -132,4 +139,5 @@ h1 {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
 }
