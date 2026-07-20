@@ -1,70 +1,125 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb, tables } from "@/db";
 import { requireCoach } from "@/lib/auth";
 import { getActiveSeason, getRoster } from "@/lib/data";
+import {
+  BARS_DIMENSIONS,
+  BARS_LEVEL_LOGIC,
+  NOT_OBSERVED,
+  type BarsCluster,
+} from "@/lib/bars";
+import { initialsOf } from "@/lib/format";
+import { formatIsoDay } from "@/lib/format";
 
-export default async function RateIndexPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ done?: string }>;
-}) {
-  await requireCoach();
+const CLUSTER_LABEL: Record<BarsCluster, string> = {
+  technical: "Technical — rate 3× a season",
+  tactical: "Tactical — rate 3× a season",
+  "self-regulation": "Self-regulation — rate after each tournament",
+  team: "Team behavior — rate after each tournament",
+  role: "Role modules — pitchers and catchers only",
+};
+
+export default async function RateIndexPage() {
+  const user = await requireCoach();
   const season = await getActiveSeason();
   if (!season) {
     return <p className="card p-6 text-sm">No active season yet.</p>;
   }
-  const { done } = await searchParams;
+  const rater = initialsOf(user.displayName);
   const roster = await getRoster(season.id);
-
   const db = await getDb();
-  const recent = await db
+  const rows = await db
     .select({
-      playerId: tables.playerRatings.playerId,
-      createdAt: tables.playerRatings.createdAt,
+      dimension: tables.barsRatings.dimension,
+      playerId: tables.barsRatings.playerId,
+      rater: tables.barsRatings.rater,
+      level: tables.barsRatings.level,
+      day: tables.barsRatings.day,
     })
-    .from(tables.playerRatings)
-    .where(eq(tables.playerRatings.seasonId, season.id))
-    .orderBy(desc(tables.playerRatings.createdAt));
-  const lastRated = new Map<string, Date>();
-  for (const r of recent) {
-    if (!lastRated.has(r.playerId)) lastRated.set(r.playerId, r.createdAt);
+    .from(tables.barsRatings)
+    .where(eq(tables.barsRatings.seasonId, season.id));
+
+  // My coverage per dimension: distinct players I've observed, latest day.
+  const mine = new Map<string, { players: Set<string>; lastDay: string }>();
+  for (const r of rows) {
+    if (r.rater !== rater || r.level === NOT_OBSERVED) continue;
+    const cur = mine.get(r.dimension) ?? { players: new Set(), lastDay: "" };
+    cur.players.add(r.playerId);
+    if (r.day > cur.lastDay) cur.lastDay = r.day;
+    mine.set(r.dimension, cur);
   }
-  const donePlayer = roster.find((p) => p.playerId === done);
+
+  const clusters: BarsCluster[] = [
+    "technical",
+    "tactical",
+    "self-regulation",
+    "team",
+    "role",
+  ];
 
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-extrabold">Player feedback</h1>
+        <h1 className="text-2xl font-extrabold">Player feedback — development levels</h1>
         <p className="mt-1 max-w-2xl text-sm text-neutral-700">
-          Tap a player, score the nine dimensions in under a minute, save.
-          Every snapshot is kept, so trends build over the season.
+          Behaviorally anchored 1–5 levels, rated against the standard for a
+          competitive 11U player — never against our own roster. <b>3 is the
+          target</b>: does it reliably, without prompting, in routine game
+          conditions. A team of twelve 3s is a successful 11U team; 5s are
+          rare on purpose. Rate one dimension at a time, from games and
+          scrimmages — not drills — and use <b>Not observed</b> honestly.
         </p>
       </div>
-      {donePlayer && (
-        <p className="rounded border border-line bg-green-600 px-3 py-2 text-sm font-semibold text-white">
-          ✓ Saved ratings for {donePlayer.firstName} {donePlayer.lastName}. Next player?
-        </p>
-      )}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {roster.map((p) => {
-          const last = lastRated.get(p.playerId);
-          return (
-            <Link
-              key={p.playerId}
-              href={`/rate/${p.playerId}`}
-              className="card p-3 font-semibold hover:bg-team-blue-light"
-            >
-              {p.firstName} {p.lastName}
-              <span className="mt-1 block text-xs font-normal text-neutral-500">
-                {last
-                  ? `last rated ${last.toLocaleDateString("en-US", { month: "numeric", day: "numeric" })}`
-                  : "never rated"}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
+
+      <details className="card p-3 text-sm">
+        <summary className="cursor-pointer font-bold">
+          The five levels (same logic for every dimension)
+        </summary>
+        <ul className="mt-2 space-y-1">
+          {BARS_LEVEL_LOGIC.map((l) => (
+            <li key={l.level}>
+              <b>
+                {l.level} — {l.label}:
+              </b>{" "}
+              {l.logic}
+            </li>
+          ))}
+        </ul>
+      </details>
+
+      {clusters.map((cluster) => (
+        <section key={cluster}>
+          <h2 className="mb-1.5 text-xs font-bold uppercase tracking-wide text-neutral-500">
+            {CLUSTER_LABEL[cluster]}
+          </h2>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {BARS_DIMENSIONS.filter((d) => d.cluster === cluster).map((d) => {
+              const cov = mine.get(d.key);
+              return (
+                <Link
+                  key={d.key}
+                  href={`/rate/${d.key}`}
+                  className="card p-3 transition hover:bg-team-blue-light"
+                >
+                  <p className="font-extrabold">
+                    <span className="mr-1.5 rounded border border-line bg-team-blue-light px-1 text-xs">
+                      {d.code}
+                    </span>
+                    {d.label}
+                  </p>
+                  <p className="mt-0.5 text-xs text-neutral-600">{d.sub}</p>
+                  <p className="mt-1 text-xs font-semibold text-neutral-500">
+                    {cov
+                      ? `you: ${cov.players.size}/${roster.length} rated · last ${formatIsoDay(cov.lastDay)}`
+                      : "you haven't rated this yet"}
+                  </p>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

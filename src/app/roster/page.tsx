@@ -24,7 +24,7 @@ import {
   pitchingRates,
 } from "@/lib/stats";
 import { POSITIONS } from "@/db/schema";
-import { DIMENSIONS, dimensionTrend } from "@/lib/development";
+import { BARS_BY_KEY, barsSummary } from "@/lib/bars";
 import { computeSeasonUsage, type PlayerUsage } from "@/lib/usage";
 import { eq, inArray } from "drizzle-orm";
 import { getDb, tables } from "@/db";
@@ -55,8 +55,8 @@ export default async function RosterPage() {
         getSeasonCatchingByPlayer(season.id),
         (await getDb())
           .select()
-          .from(tables.playerRatings)
-          .where(eq(tables.playerRatings.seasonId, season.id)),
+          .from(tables.barsRatings)
+          .where(eq(tables.barsRatings.seasonId, season.id)),
       ])
     : [null, null, null, null, null, null];
 
@@ -78,33 +78,22 @@ export default async function RosterPage() {
     usage = computeSeasonUsage(liveGames, assignmentRows);
   }
 
-  // Latest feedback score + trend per dimension per player.
+  // BARS development levels: each rater's latest observed level, medianed
+  // across raters, with two-level splits flagged rather than averaged away.
   const feedbackByPlayer = new Map<
     string,
-    { key: string; label: string; latest: number; arrow: string }[]
+    { key: string; label: string; latest: number; arrow: string; flagged: boolean }[]
   >();
   if (feedbackRows) {
-    const byPlayer = new Map<string, typeof feedbackRows>();
-    for (const r of feedbackRows) {
-      byPlayer.set(r.playerId, [...(byPlayer.get(r.playerId) ?? []), r]);
-    }
     const ARROW = { up: "↗", down: "↘", flat: "→" } as const;
-    for (const [pid, rows] of byPlayer) {
-      const dims = DIMENSIONS.map((dim) => {
-        const trend = dimensionTrend(
-          rows
-            .filter((r) => r.dimension === dim.key)
-            .map((r) => ({ rating: r.rating, createdAt: r.createdAt })),
-        );
-        return trend.latest === null
-          ? null
-          : {
-              key: dim.key,
-              label: dim.label,
-              latest: trend.latest,
-              arrow: trend.direction ? ARROW[trend.direction] : "",
-            };
-      }).filter((d): d is NonNullable<typeof d> => d !== null);
+    for (const [pid, cells] of barsSummary(feedbackRows)) {
+      const dims = [...cells.entries()].map(([key, cell]) => ({
+        key,
+        label: `${BARS_BY_KEY[key].code} ${BARS_BY_KEY[key].label}`,
+        latest: cell.median,
+        arrow: cell.direction ? ARROW[cell.direction] : "",
+        flagged: cell.flagged,
+      }));
       if (dims.length > 0) feedbackByPlayer.set(pid, dims);
     }
   }
@@ -185,7 +174,7 @@ function RosterRow({
   pitching: Parameters<typeof pitchingRates>[0] | undefined;
   fielding: Parameters<typeof fieldingRates>[0] | undefined;
   catching: Parameters<typeof catchingRates>[0] | undefined;
-  feedback: { key: string; label: string; latest: number; arrow: string }[] | undefined;
+  feedback: { key: string; label: string; latest: number; arrow: string; flagged: boolean }[] | undefined;
   usage: PlayerUsage | undefined;
 }) {
   const bat = batting ? battingRates(batting) : null;
@@ -310,18 +299,27 @@ function RosterRow({
                       );
                     })}
                   </div>
-                  <p className="mt-2 font-bold uppercase text-neutral-500">Player feedback (latest · trend)</p>
+                  <p className="mt-2 font-bold uppercase text-neutral-500">
+                    Development levels (1–5 · 3 = the 11U standard)
+                  </p>
                   {feedback ? (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {feedback.map((f) => (
-                        <span key={f.key} className="rounded border border-line bg-paper-tint px-1.5 py-0.5 font-semibold">
+                        <span
+                          key={f.key}
+                          title={f.flagged ? "Coaches split by 2+ levels — worth a conversation" : undefined}
+                          className={`rounded border px-1.5 py-0.5 font-semibold ${
+                            f.flagged ? "border-amber-500 bg-amber-50" : "border-line bg-paper-tint"
+                          }`}
+                        >
                           {f.label} {f.latest}
                           {f.arrow}
+                          {f.flagged && " ⚑"}
                         </span>
                       ))}
                     </div>
                   ) : (
-                    <p className="mt-1 text-neutral-500">No feedback scores yet.</p>
+                    <p className="mt-1 text-neutral-500">No development levels yet.</p>
                   )}
                 </div>
                 <div className="space-y-1">

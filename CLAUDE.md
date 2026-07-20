@@ -46,6 +46,16 @@
   roster's Positions column = depth-chart primaries/secondaries with
   blended ratings (top-3 rated as fallback); parents see only the
   self-reported text.
+- **BARS feedback (`src/lib/bars.ts`, `bars_ratings`)**: player feedback
+  is criterion-referenced 1–5 (3 = the 11U standard) across D1–D9 + P/C
+  role modules, with full behavioral anchors on screen during entry.
+  Dimension-first flow at /rate/[dimension]; level 0 = "not observed"
+  (never default a 3); append-only rows; display = median of each
+  rater's latest, splits ≥2 flagged not averaged. NO composite score or
+  player ranking anywhere — keep it that way. Legacy `player_ratings`
+  stays as history. Reports live under Performance, pull BARS + anchors
+  + next-level targets + GC stats + playing time, and always include
+  the scale explanation (`BARS_SCALE_EXPLANATION`).
 - **Types over enums**: text columns typed with `$type<...>()` unions.
 - **Theme**: tokens in `src/app/globals.css` (`--color-team-*`); Columbia
   blue primary, orange accent, black borders. Exact shades pending the team
