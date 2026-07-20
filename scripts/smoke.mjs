@@ -99,6 +99,14 @@ await page.goto(BASE + "/matrix");
 const clearedText = await page.textContent("main");
 if (clearedText?.includes("Coach ZZ")) fail("cleared rater tab still present");
 
+// Quick entry: taps save under the signed-in coach's initials (Coach Demo → CD).
+await page.goto(BASE + "/matrix/quick");
+await page.locator("button[data-pos='P'][data-val='7']").click();
+await page.waitForTimeout(800);
+await page.goto(BASE + "/matrix?rater=CD");
+const cdVal = await page.locator("input[name='pos_P']").first().inputValue();
+if (cdVal !== "7") fail(`quick entry did not save as CD (got "${cdVal}")`);
+
 // Lineup lab: solver renders a full field from the seeded matrix.
 await page.goto(BASE + "/lineup");
 const lineupText = await page.textContent("main");
@@ -175,6 +183,12 @@ if (!fieldText?.includes("Batting order")) fail("dashboard missing batting order
 // All nine positions filled by the solver seed (no dashed empty slots).
 const emptySlots = await page.locator("button:has-text('—')").count();
 if (emptySlots > 0) fail(`dashboard left ${emptySlots} field slots empty`);
+// Batting order generator: applies an order and explains its choices.
+page.once("dialog", (d) => d.accept());
+await page.click("button:has-text('Suggest order')");
+await page.waitForTimeout(1000);
+const orderText = await page.textContent("main");
+if (!orderText?.includes("leadoff")) fail("batting order generator notes missing");
 // Start the game, add pitches for the pitcher, score a run, take an out.
 await page.click("button:has-text('Start game')");
 await page.locator("button:has-text('Final')").waitFor({ timeout: 15000 });

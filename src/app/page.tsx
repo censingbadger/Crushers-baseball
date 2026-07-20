@@ -252,7 +252,7 @@ async function CoachPanels({
     },
     {
       href: "/matrix",
-      title: "Matrix",
+      title: "Position matrix",
       line: `${raterCount} ${raterCount === 1 ? "coach" : "coaches"} rating · ${unrated.length} unrated`,
     },
     {

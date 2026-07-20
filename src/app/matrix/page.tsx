@@ -80,6 +80,12 @@ export default async function MatrixPage({
         >
           + New coach
         </Link>
+        <Link
+          className="ml-auto rounded border border-team-orange-dark bg-team-orange px-3 py-1 text-paper"
+          href="/matrix/quick"
+        >
+          ✎ Quick entry
+        </Link>
       </div>
 
       {activeTab === "blended" && raters.length > 0 && (

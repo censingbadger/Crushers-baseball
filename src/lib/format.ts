@@ -28,6 +28,15 @@ export const EVENT_TYPE_LABEL: Record<string, string> = {
   tournament: "Tournament",
 };
 
+/** "Mike Christian" → "MC" — the rater label a coach's ratings file under. */
+export function initialsOf(displayName: string): string {
+  const parts = displayName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return displayName.trim().slice(0, 2).toUpperCase();
+}
+
 export const RSVP_LABEL: Record<string, string> = {
   yes: "In",
   no: "Out",

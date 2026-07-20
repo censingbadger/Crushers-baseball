@@ -12,6 +12,8 @@ import { blendedLookup, getCurrentRatings } from "@/lib/matrix";
 import { solveLineup, type LineupCandidate } from "@/lib/lineup";
 import { BENCH, planMove, type Slot } from "@/lib/gameday";
 import { pitchEligibility, type DayPitches } from "@/lib/pitchsmart";
+import { suggestBattingOrder, type BatterInput } from "@/lib/batting";
+import { getSeasonBattingByPlayer } from "@/lib/performance";
 
 function isoDateOf(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -416,6 +418,88 @@ export async function swapBattingSpot(
     .set({ spot: a.spot })
     .where(eq(tables.battingOrders.id, b.id));
   revalidatePath(`/game/${gameId}`);
+}
+
+/**
+ * Generate and apply a batting order for this game's batters: GameChanger
+ * season rates blended with the coaches' hitting ratings, arranged in the
+ * classic construction. Returns per-slot reasoning for the dashboard.
+ */
+export async function applySuggestedBattingOrder(
+  gameId: string,
+): Promise<{ ok: boolean; notes: string[] }> {
+  await requireCoach();
+  const db = await getDb();
+  const [game] = await db
+    .select()
+    .from(tables.liveGames)
+    .where(eq(tables.liveGames.id, gameId))
+    .limit(1);
+  if (!game) return { ok: false, notes: ["Game not found."] };
+
+  const orderRows = await db
+    .select()
+    .from(tables.battingOrders)
+    .where(eq(tables.battingOrders.gameId, gameId));
+  if (orderRows.length === 0) return { ok: false, notes: ["No batters in this game yet."] };
+  const batterIds = orderRows.map((o) => o.playerId);
+
+  const [battingByPlayer, ratingRows, players] = await Promise.all([
+    getSeasonBattingByPlayer(game.seasonId),
+    db
+      .select({
+        playerId: tables.playerRatings.playerId,
+        rating: tables.playerRatings.rating,
+        createdAt: tables.playerRatings.createdAt,
+      })
+      .from(tables.playerRatings)
+      .where(
+        and(
+          eq(tables.playerRatings.seasonId, game.seasonId),
+          eq(tables.playerRatings.dimension, "hitting"),
+        ),
+      ),
+    db
+      .select({
+        id: tables.players.id,
+        firstName: tables.players.firstName,
+        lastName: tables.players.lastName,
+      })
+      .from(tables.players)
+      .where(inArray(tables.players.id, batterIds)),
+  ]);
+
+  // Latest hitting rating per player.
+  const hittingByPlayer = new Map<string, number>();
+  for (const r of ratingRows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())) {
+    hittingByPlayer.set(r.playerId, r.rating);
+  }
+
+  const inputs: BatterInput[] = batterIds.map((pid) => ({
+    playerId: pid,
+    batting: battingByPlayer.get(pid) ?? null,
+    hittingRating: hittingByPlayer.get(pid) ?? null,
+  }));
+  const { order, reasons } = suggestBattingOrder(inputs);
+
+  for (let i = 0; i < order.length; i++) {
+    await db
+      .update(tables.battingOrders)
+      .set({ spot: i + 1 })
+      .where(
+        and(
+          eq(tables.battingOrders.gameId, gameId),
+          eq(tables.battingOrders.playerId, order[i]),
+        ),
+      );
+  }
+  revalidatePath(`/game/${gameId}`);
+
+  const nameOf = new Map(players.map((p) => [p.id, `${p.firstName} ${p.lastName.charAt(0)}.`]));
+  const notes = order.map(
+    (pid, i) => `${i + 1}. ${nameOf.get(pid) ?? "?"} — ${reasons[pid] ?? ""}`,
+  );
+  return { ok: true, notes };
 }
 
 export async function removeGame(formData: FormData): Promise<void> {

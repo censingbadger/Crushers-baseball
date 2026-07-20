@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   addPitches,
   addRun,
+  applySuggestedBattingOrder,
   cycleOuts,
   finishGame,
   moveGamePlayer,
@@ -163,6 +164,8 @@ export function Dashboard(props: Props) {
   const [focusGap, setFocusGap] = useState<string | null>(null);
   // The slot a move just filled — the island shows its depth chart.
   const [focusSlot, setFocusSlot] = useState<string | null>(null);
+  // Reasoning lines from the last generated batting order.
+  const [orderNotes, setOrderNotes] = useState<string[] | null>(null);
   // Drag state: press a chip (long-press on touch, click-hold on mouse),
   // pull it over a slot or the bench, release to drop.
   const [drag, setDrag] = useState<{ pid: string; x: number; y: number; armed: boolean } | null>(null);
@@ -665,7 +668,31 @@ export function Dashboard(props: Props) {
             )}
           </div>
           <div className="rounded-lg border border-line bg-paper p-2">
-            <span className="text-xs font-bold uppercase">Batting order</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase">Batting order</span>
+              <button
+                className="btn px-2 py-0.5 text-xs"
+                disabled={pending || busy}
+                onClick={() => {
+                  if (!window.confirm("Replace the current batting order with a generated one? You can still fine-tune with the arrows.")) return;
+                  startTransition(async () => {
+                    const res = await applySuggestedBattingOrder(game.id);
+                    setOrderNotes(res.notes);
+                    router.refresh();
+                  });
+                }}
+              >
+                ✨ Suggest order
+              </button>
+            </div>
+            {orderNotes && (
+              <div className="mt-1 rounded bg-team-blue-light/60 p-1.5 text-[11px] font-semibold text-neutral-700">
+                {orderNotes.slice(0, 5).map((n) => (
+                  <p key={n}>{n}</p>
+                ))}
+                {orderNotes.length > 5 && <p>… rest by overall quality.</p>}
+              </div>
+            )}
             <ol className="mt-1 space-y-0.5 text-sm">
               {props.battingOrder.map((o, i) => (
                 <li key={o.playerId} className="flex items-center gap-1">
