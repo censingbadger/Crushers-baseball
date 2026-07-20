@@ -222,6 +222,9 @@ export const playerRatings = pgTable("player_ratings", {
   rating: integer("rating").notNull(),
   context: text("context").$type<RatingContext>().notNull().default("general"),
   note: text("note"),
+  /** The day the feedback is FOR (a coach can log Tuesday's practice on
+   * Wednesday); createdAt stays the bookkeeping timestamp. */
+  day: date("day"),
   rater: text("rater").notNull(),
   createdByUserId: uuid("created_by_user_id").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),

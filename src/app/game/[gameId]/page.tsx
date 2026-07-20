@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb, tables } from "@/db";
 import { POSITIONS } from "@/db/schema";
 import { requireCoach } from "@/lib/auth";
 import { benchInnings } from "@/lib/gameday";
+import { computeSeasonUsage } from "@/lib/usage";
 import { gameSnapshot } from "@/app/game/actions";
 import { Dashboard } from "./Dashboard";
 
@@ -41,9 +42,26 @@ export default async function GamePage({
     }
   }
 
+  // Season sit-share per player — the fairness number, on the bench chips.
+  const db = await getDb();
+  const seasonGames = await db
+    .select()
+    .from(tables.liveGames)
+    .where(eq(tables.liveGames.seasonId, game.seasonId));
+  const seasonAssignments = seasonGames.length
+    ? await db
+        .select()
+        .from(tables.gameAssignments)
+        .where(inArray(tables.gameAssignments.gameId, seasonGames.map((g) => g.id)))
+    : [];
+  const seasonUsage = computeSeasonUsage(seasonGames, seasonAssignments);
+  const seasonSatShareByPlayer: Record<string, number> = {};
+  for (const [pid, u] of seasonUsage) {
+    if (u.satShare !== null) seasonSatShareByPlayer[pid] = u.satShare;
+  }
+
   // Positions each kid says they want (free text like "SS, P" → tokens) —
   // the depth chart stars them so playing-time promises stay visible.
-  const db = await getDb();
   const aspRows = await db
     .select({
       playerId: tables.aspirations.playerId,
@@ -89,6 +107,7 @@ export default async function GamePage({
         eligibility={snap.eligibility}
         ratingsByPlayer={snap.ratingsByPlayer}
         aspiringByPlayer={aspiringByPlayer}
+        seasonSatShareByPlayer={seasonSatShareByPlayer}
         score={scoreRows.map((s) => ({ inning: s.inning, side: s.side, runs: s.runs }))}
         battingOrder={orderRows.map((o) => ({ playerId: o.playerId, spot: o.spot }))}
       />

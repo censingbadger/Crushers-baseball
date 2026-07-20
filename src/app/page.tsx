@@ -151,9 +151,15 @@ export default async function HomePage() {
                 {isCoach ? "Event details" : "Details & RSVP"}
               </Link>
               {isCoach && next.type === "practice" && (
-                <Link className="btn px-4 py-1.5 text-sm" href="/drills">
-                  Drill library
-                </Link>
+                <>
+                  {/* Practice night's habit: log feedback while it's fresh. */}
+                  <Link className="btn px-4 py-1.5 text-sm" href="/rate">
+                    Log feedback
+                  </Link>
+                  <Link className="btn px-4 py-1.5 text-sm" href="/drills">
+                    Drill library
+                  </Link>
+                </>
               )}
               <Link className="btn px-4 py-1.5 text-sm" href="/schedule">
                 Full schedule
@@ -256,9 +262,9 @@ async function CoachPanels({
       line: `${raterCount} ${raterCount === 1 ? "coach" : "coaches"} rating · ${unrated.length} unrated`,
     },
     {
-      href: "/lineup",
-      title: "Lineup lab",
-      line: "Build a field from the current matrix",
+      href: "/roster",
+      title: "Roster",
+      line: "Every player: ratings, stats, feedback",
     },
     {
       href: "/weekend",

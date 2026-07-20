@@ -6,6 +6,7 @@ import {
   importRoster,
   importTournamentGrid,
 } from "./actions";
+import { importMatrixXlsx } from "@/app/matrix/actions";
 
 export default async function ImportPage() {
   await requireCoach();
@@ -41,6 +42,12 @@ export default async function ImportPage() {
         title="4 · Pitching cues (optional)"
         description={'CSV rows of "Player,Tendency,Cue" (no header needed). Loads the tendency→cue pairs coaches keep — coach-only until shared from a player’s page.'}
         action={importCues}
+      />
+      <ImportForm
+        title="5 · Position matrix workbook (.xlsx, one-time)"
+        description="One sheet per coach (e.g. 'Position Matrix_MC' → coach MC). Day-to-day rating now happens in the app (Position matrix → Rate players); this import exists for bringing in an old workbook."
+        action={importMatrixXlsx}
+        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       />
     </div>
   );

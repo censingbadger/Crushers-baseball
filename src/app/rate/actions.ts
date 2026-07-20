@@ -13,6 +13,7 @@ const metaSchema = z.object({
   rater: z.string().trim().min(1).max(20),
   context: z.enum(["practice", "game", "general"]),
   note: z.string().trim().max(500).optional(),
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 export async function saveRatings(formData: FormData): Promise<void> {
@@ -22,9 +23,10 @@ export async function saveRatings(formData: FormData): Promise<void> {
     rater: formData.get("rater"),
     context: formData.get("context"),
     note: formData.get("note") || undefined,
+    day: formData.get("day") || undefined,
   });
   if (!parsed.success) return;
-  const { playerId, rater, context, note } = parsed.data;
+  const { playerId, rater, context, note, day } = parsed.data;
 
   const db = await getDb();
   const [season] = await db
@@ -47,6 +49,7 @@ export async function saveRatings(formData: FormData): Promise<void> {
       rating,
       context,
       note: wrote ? null : (note ?? null), // attach the note once, not 9 times
+      day: day ?? null,
       rater,
       createdByUserId: user.id,
     });

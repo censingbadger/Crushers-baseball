@@ -15,10 +15,19 @@
 - **Auth**: coach/parent roles. Anything contact/medical is coach-only —
   enforce in server components/actions, not just UI.
 - **Coach-first mode**: the active tool is ratings/lineups/dugout/stats;
-  family-facing features (availability, players, progress, reports) are
-  parked behind the "Future preview" nav group + amber banners, driven by
-  `src/lib/preview.ts`. Don't delete parked features — they turn back on
-  by editing that file. Parent logins exist but were never distributed.
+  family-facing features (schedule, availability, players, progress,
+  reports) are parked behind the "Future preview" nav group + amber
+  banners, driven by `src/lib/preview.ts`. Don't delete parked features —
+  they turn back on by editing that file. Parent logins exist but were
+  never distributed.
+- **Phase 8 simplification (Mike's direction)**: GameChanger records
+  games — this app plans and runs the dugout. No score/clock/outs UI.
+  The dugout has a coach view (assist island, Pitch Smart) and a
+  player-safe "Dugout board" (diamond + batting order only, no ratings
+  or suggestions). Lineup lab merged into Game day (⚡ Auto-arrange;
+  /lineup redirects). Matrix editing = quick entry only (per-coach,
+  initials from login); the blended grid is read-only. All roster
+  statuses (practice/hopeful) are game-eligible.
 - **Types over enums**: text columns typed with `$type<...>()` unions.
 - **Theme**: tokens in `src/app/globals.css` (`--color-team-*`); Columbia
   blue primary, orange accent, black borders. Exact shades pending the team
