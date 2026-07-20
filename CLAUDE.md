@@ -42,7 +42,10 @@
   Pitch Smart still zeroes resting arms at P in auto-arrange. The
   practice sorter (`/practice`, `src/lib/practice.ts`) splits the
   roster across stations from the same signals (develop spots /
-  needs-work primaries / ★ asks / usage), never-cells excluded.
+  needs-work primaries / ★ asks / usage), never-cells excluded. The
+  roster's Positions column = depth-chart primaries/secondaries with
+  blended ratings (top-3 rated as fallback); parents see only the
+  self-reported text.
 - **Types over enums**: text columns typed with `$type<...>()` unions.
 - **Theme**: tokens in `src/app/globals.css` (`--color-team-*`); Columbia
   blue primary, orange accent, black borders. Exact shades pending the team

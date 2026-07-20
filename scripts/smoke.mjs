@@ -125,6 +125,11 @@ const cellAfter = page.locator(`button[data-cell='${cellKey}']`);
 if ((await cellAfter.textContent())?.trim().charAt(0) !== "P") {
   fail("depth chart tap did not persist as primary");
 }
+// That primary now leads the roster's Positions column as an orange chip.
+await page.goto(BASE + "/roster");
+if ((await page.locator("tbody span[title^='Primary']").count()) === 0)
+  fail("roster Positions column missing the depth-chart primary chip");
+await page.goto(BASE + "/depth");
 for (let i = 0; i < 5; i++) {
   await cellAfter.click();
   await page.waitForTimeout(250);

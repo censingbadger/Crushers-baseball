@@ -11,6 +11,8 @@ export interface UsageGame {
   status: string; // "setup" | "live" | "final"
   currentInning: number;
   innings: number;
+  /** ISO day the game was played (local). */
+  gameDate: string;
 }
 
 export interface UsageAssignment {
@@ -32,21 +34,35 @@ export interface PlayerUsage {
   positions: [string, number][];
 }
 
+/** Today's date the way the dugout stamps games (server-local). */
+export function todayIsoLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /**
- * Innings that actually happened in a game: everything up to the current
- * inning for a finished game, and completed innings only (current - 1)
- * while a game is in progress — matching the dugout's own bench math.
+ * Innings that actually happened in a game. The inning stepper is the
+ * source of truth when the coach used it — but the dugout doesn't force
+ * ceremony, so a finished (or past-date) game whose stepper never moved
+ * off inning 1 counts its full planned innings: the game happened, the
+ * lineup plan covered it. Today's unfinished games count completed
+ * innings only (current − 1), matching the dugout's own bench math.
  */
-export function countedInnings(game: UsageGame): number {
-  if (game.status === "final") return Math.min(game.currentInning, 9);
+export function countedInnings(game: UsageGame, todayIso: string): number {
+  const stepped = game.currentInning > 1;
+  if (game.status === "final") {
+    return stepped ? Math.min(game.currentInning, 9) : game.innings;
+  }
+  if (!stepped && game.gameDate < todayIso) return game.innings;
   return Math.max(0, game.currentInning - 1);
 }
 
 export function computeSeasonUsage(
   games: UsageGame[],
   assignments: UsageAssignment[],
+  todayIso: string = todayIsoLocal(),
 ): Map<string, PlayerUsage> {
-  const cutoff = new Map(games.map((g) => [g.id, countedInnings(g)]));
+  const cutoff = new Map(games.map((g) => [g.id, countedInnings(g, todayIso)]));
   const acc = new Map<
     string,
     { games: Set<string>; field: number; bench: number; positions: Map<string, number> }
