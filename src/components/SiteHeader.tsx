@@ -48,6 +48,7 @@ const COACH_ENTRIES: NavEntry[] = [
     label: "Planning",
     items: [
       { href: "/weekend", label: "Weekend" },
+      { href: "/practice", label: "Practice stations" },
       { href: "/drills", label: "Drills" },
     ],
   },

@@ -19,7 +19,7 @@ mkdirSync(SHOTS, { recursive: true });
 const COACH_PAGES = [
   "/", "/schedule", "/schedule/new", "/roster", "/roster/new", "/players",
   "/availability", "/progress", "/stats", "/games", "/rate", "/reports",
-  "/matrix", "/matrix?rater=AB", "/depth", "/lineup", "/weekend", "/drills",
+  "/matrix", "/matrix?rater=AB", "/depth", "/practice", "/lineup", "/weekend", "/drills",
   "/families", "/import", "/account",
 ];
 const PARENT_PAGES = [
