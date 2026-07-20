@@ -58,6 +58,34 @@ function toNumber(v: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function bestHeaderMatch(grid: string[][], spec: Record<string, string[]>): number {
+  let best = 0;
+  for (let i = 0; i < Math.min(grid.length, 5); i++) {
+    const cells = grid[i].map(norm);
+    let n = 0;
+    for (const aliases of Object.values(spec)) {
+      if (cells.some((c) => aliases.includes(c))) n++;
+    }
+    best = Math.max(best, n);
+  }
+  return best;
+}
+
+/**
+ * Which export is this file? Both kinds share H/R/BB/K columns, so lines
+ * can parse under either spec — the reliable signal is which spec matches
+ * MORE header columns (IP/BF/ER pull pitching, AB/2B/HR/RBI pull batting).
+ */
+export function detectGcKind(csv: string): GcKind | null {
+  const grid = Papa.parse<string[]>(csv.replace(/^﻿/, "").trim(), {
+    skipEmptyLines: true,
+  }).data;
+  const batting = bestHeaderMatch(grid, BATTING_COLUMNS);
+  const pitching = bestHeaderMatch(grid, PITCHING_COLUMNS);
+  if ((batting < 3 && pitching < 3) || batting === pitching) return null;
+  return batting > pitching ? "batting" : "pitching";
+}
+
 export function parseGameChangerCsv(
   csv: string,
   kind: GcKind,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseGameChangerCsv } from "./gamechanger";
+import { detectGcKind, parseGameChangerCsv } from "./gamechanger";
 
 // Synthetic fixtures shaped like GameChanger season exports. Fictional names.
 const ROSTER = [
@@ -66,5 +66,20 @@ describe("parseGameChangerCsv — name variants", () => {
     const r = parseGameChangerCsv("just,some,junk\n1,2,3", "batting", ROSTER);
     expect(r.lines).toHaveLength(0);
     expect(r.warnings[0]).toContain("header row");
+  });
+});
+
+describe("detectGcKind", () => {
+  it("tells the two exports apart by header column counts", () => {
+    expect(
+      detectGcKind("Last,First,AB,R,H,2B,3B,HR,RBI,BB,K,SB\nVance,Milo,6,2,3,1,0,1,4,1,2,1"),
+    ).toBe("batting");
+    expect(
+      detectGcKind("Last,First,IP,BF,ER,BB,K,H\nCastillo,Leo,4.2,20,2,3,7,4"),
+    ).toBe("pitching");
+  });
+
+  it("returns null for files that match neither", () => {
+    expect(detectGcKind("Name,Email,Phone\nSomeone,a@b.c,555")).toBeNull();
   });
 });

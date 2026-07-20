@@ -13,13 +13,8 @@ import {
   pitchingRates,
 } from "@/lib/stats";
 import { formatIsoDay } from "@/lib/format";
-import { ImportForm } from "@/app/import/ImportForm";
-import {
-  createStatGame,
-  deleteStatGame,
-  importGcBatting,
-  importGcPitching,
-} from "./actions";
+import { GcPortal } from "./GcPortal";
+import { createStatGame, deleteStatGame } from "./actions";
 
 const fmt3 = (v: number | null) =>
   v === null ? "—" : v.toFixed(3).replace(/^0/, "");
@@ -92,6 +87,8 @@ export default async function StatsPage() {
           compute on a 6-inning basis.
         </p>
       </div>
+
+      {isCoach && <GcPortal />}
 
       <section className="card overflow-x-auto p-4">
         <h2 className="mb-2 text-lg font-bold">Batting</h2>
@@ -236,16 +233,6 @@ export default async function StatsPage() {
             <button className="btn btn-primary" type="submit">Create & enter stats</button>
           </form>
 
-          <ImportForm
-            title="Import GameChanger batting export (.csv)"
-            description="GC web → team stats → export batting as CSV. Rows match the roster by name; re-importing replaces the previous GC snapshot, so run it whenever you like."
-            action={importGcBatting}
-          />
-          <ImportForm
-            title="Import GameChanger pitching export (.csv)"
-            description="Same export flow, pitching tab. IP in GC's 3.2 notation is understood."
-            action={importGcPitching}
-          />
         </>
       )}
     </div>
