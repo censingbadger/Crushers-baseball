@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   addPitches,
@@ -13,6 +13,7 @@ import {
   swapBattingSpot,
 } from "@/app/game/actions";
 import { BENCH } from "@/lib/gameday";
+import { auditLineup, gapFillOptions, type Move } from "@/lib/recommend";
 
 const POSITIONS = ["P", "C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"] as const;
 
@@ -156,6 +157,21 @@ export function Dashboard(props: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [warning, setWarning] = useState<{ playerId: string; target: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  // The slot a move just vacated — the assist island leads with it.
+  const [focusGap, setFocusGap] = useState<string | null>(null);
+  // Drag state: press a chip (long-press on touch, click-hold on mouse),
+  // pull it over a slot or the bench, release to drop.
+  const [drag, setDrag] = useState<{ pid: string; x: number; y: number; armed: boolean } | null>(null);
+  const [dropHover, setDropHover] = useState<string | null>(null);
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const holdTimer = useRef<number | null>(null);
+  const suppressClick = useRef(false);
+  // Window-level pointer handlers bind once per drag; they read the live
+  // drag state through this ref instead of a stale closure.
+  const dragRef = useRef(drag);
+  useEffect(() => {
+    dragRef.current = drag;
+  }, [drag]);
 
   // Keep other devices in sync: refresh server state every 15s.
   useEffect(() => {
@@ -185,6 +201,9 @@ export function Dashboard(props: Props) {
 
   async function doMove(playerId: string, target: string, force = false) {
     setBusy(true);
+    // Compute before the write: does this move leave a hole behind?
+    const from = current[playerId] ?? BENCH;
+    const occupant = target !== BENCH ? (playerAt.get(target) ?? null) : null;
     const result = await moveGamePlayer(game.id, playerId, target as never, force);
     setBusy(false);
     if (!result.ok && result.warning) {
@@ -193,8 +212,77 @@ export function Dashboard(props: Props) {
     }
     setWarning(null);
     setSelected(null);
+    setFocusGap(from !== BENCH && from !== target && !occupant ? from : null);
     startTransition(() => router.refresh());
   }
+
+  /** Apply a suggestion: its moves in order (a shift is move + backfill). */
+  async function applyMoves(moves: Move[]) {
+    for (const m of moves) {
+      await doMove(m.playerId, m.target);
+    }
+    setFocusGap(null);
+  }
+
+  // ---- drag & drop (pointer events: mouse + touch share one path) ----
+
+  function chipPointerDown(e: React.PointerEvent, pid: string) {
+    if (busy || game.status === "final") return;
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    setDrag({ pid, x: e.clientX, y: e.clientY, armed: false });
+    if (e.pointerType !== "mouse") {
+      // Long-press arms the drag on touch; a quick tap stays a tap.
+      holdTimer.current = window.setTimeout(() => {
+        setDrag((d) => (d ? { ...d, armed: true } : d));
+      }, 260);
+    }
+  }
+
+  useEffect(() => {
+    if (!drag) return;
+    const onMove = (e: PointerEvent) => {
+      const start = dragStart.current;
+      if (!start) return;
+      const dist = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+      setDrag((d) => {
+        if (!d) return d;
+        const armed = d.armed || dist > 6;
+        return { ...d, x: e.clientX, y: e.clientY, armed };
+      });
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      setDropHover(el?.closest("[data-drop]")?.getAttribute("data-drop") ?? null);
+    };
+    const finish = (e: PointerEvent) => {
+      if (holdTimer.current) window.clearTimeout(holdTimer.current);
+      const d = dragRef.current;
+      setDrag(null);
+      setDropHover(null);
+      dragStart.current = null;
+      if (!d?.armed) return; // plain tap — the chip's onClick handles it
+      suppressClick.current = true;
+      window.setTimeout(() => (suppressClick.current = false), 250);
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const target = el?.closest("[data-drop]")?.getAttribute("data-drop");
+      if (target && target !== (current[d.pid] ?? BENCH)) {
+        void doMove(d.pid, target);
+      }
+    };
+    const cancel = () => {
+      if (holdTimer.current) window.clearTimeout(holdTimer.current);
+      setDrag(null);
+      setDropHover(null);
+      dragStart.current = null;
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", cancel);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", cancel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drag !== null, current]);
 
   function tapSlot(slot: string) {
     if (busy) return;
@@ -215,11 +303,35 @@ export function Dashboard(props: Props) {
     setSelected(selected === pid ? null : pid);
   }
 
-  const suggestionsFor = (slot: string) =>
-    benchIds
-      .map((pid) => ({ pid, rating: props.ratingsByPlayer[pid]?.[slot] ?? 1 }))
-      .sort((a, b) => b.rating - a.rating)
-      .slice(0, 3);
+  // ---- the assist island's brain: gaps + audit, recomputed per state ----
+  const emptySlots = useMemo(
+    () => POSITIONS.filter((p) => !playerAt.get(p)),
+    [playerAt],
+  );
+  const orderedGaps = useMemo(
+    () =>
+      focusGap && emptySlots.includes(focusGap as (typeof POSITIONS)[number])
+        ? [focusGap, ...emptySlots.filter((s) => s !== focusGap)]
+        : [...emptySlots],
+    [emptySlots, focusGap],
+  );
+  const gapOptions = useMemo(
+    () =>
+      new Map(
+        orderedGaps.map((slot) => [slot, gapFillOptions(slot, current, props.ratingsByPlayer)]),
+      ),
+    [orderedGaps, current, props.ratingsByPlayer],
+  );
+  const audit = useMemo(
+    () =>
+      auditLineup(current, props.ratingsByPlayer, props.benchInningsByPlayer).filter(
+        (s) => s.kind !== "gap", // gaps get their richer treatment above
+      ),
+    [current, props.ratingsByPlayer, props.benchInningsByPlayer],
+  );
+
+  const ratingChip = (pid: string, slot: string) =>
+    props.ratingsByPlayer[pid]?.[slot] ?? 1;
 
   const scoreFor = (inning: number, side: "us" | "them") =>
     props.score.find((s) => s.inning === inning && s.side === side)?.runs;
@@ -319,18 +431,27 @@ export function Dashboard(props: Props) {
               const pid = playerAt.get(pos) ?? null;
               const sel = pid !== null && pid === selected;
               const empty = pid === null;
+              const dragged = drag?.armed && pid !== null && drag.pid === pid;
+              const hovered = drag?.armed && dropHover === pos;
               return (
                 <button
                   key={pos}
-                  style={SLOT_POS[pos]}
-                  onClick={() => tapSlot(pos)}
+                  data-drop={pos}
+                  style={{ ...SLOT_POS[pos], touchAction: "none" }}
+                  onPointerDown={pid ? (e) => chipPointerDown(e, pid) : undefined}
+                  onClick={() => {
+                    if (suppressClick.current) return;
+                    tapSlot(pos);
+                  }}
                   className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-lg border-2 px-2 py-1 text-center shadow ${
                     sel
                       ? "border-team-orange bg-team-orange text-paper"
                       : empty
                         ? "border-dashed border-white bg-white/20 text-white"
                         : "border-ink bg-paper"
-                  } ${selected && !sel ? "ring-2 ring-team-orange" : ""}`}
+                  } ${selected && !sel ? "ring-2 ring-team-orange" : ""} ${
+                    hovered ? "scale-110 ring-4 ring-team-orange" : ""
+                  } ${dragged ? "opacity-40" : ""}`}
                 >
                   <span className="block text-[11px] font-bold uppercase opacity-70">{pos}</span>
                   <span className="block text-sm font-extrabold leading-tight">
@@ -377,8 +498,16 @@ export function Dashboard(props: Props) {
             </div>
           )}
 
-          {/* Bench */}
-          <div className="mt-2 rounded-lg border border-line bg-paper p-2">
+        </div>
+
+        {/* Right rail: bench roster, the assist island, batting order */}
+        <div className="space-y-3">
+          <div
+            data-drop={BENCH}
+            className={`rounded-lg border border-line bg-paper p-2 ${
+              drag?.armed && dropHover === BENCH ? "ring-4 ring-team-orange" : ""
+            }`}
+          >
             <span className="text-xs font-bold uppercase">Bench</span>
             <div className="mt-1 flex flex-wrap gap-1">
               {benchIds.length === 0 && (
@@ -387,12 +516,17 @@ export function Dashboard(props: Props) {
               {benchIds.map((pid) => (
                 <button
                   key={pid}
-                  onClick={() => tapBenchPlayer(pid)}
+                  style={{ touchAction: "none" }}
+                  onPointerDown={(e) => chipPointerDown(e, pid)}
+                  onClick={() => {
+                    if (suppressClick.current) return;
+                    tapBenchPlayer(pid);
+                  }}
                   className={`rounded-lg border-2 px-2 py-1 text-sm font-bold ${
                     selected === pid
                       ? "border-team-orange bg-team-orange text-paper"
                       : "border-ink bg-team-blue-light"
-                  }`}
+                  } ${drag?.armed && drag.pid === pid ? "opacity-40" : ""}`}
                 >
                   {nameOf(pid)}
                   <span className="ml-1 text-[11px] font-semibold opacity-70">
@@ -410,32 +544,72 @@ export function Dashboard(props: Props) {
                 </button>
               )}
             </div>
-            {selected && (
-              <p className="mt-1 text-xs font-semibold text-team-orange-dark">
-                {nameOf(selected)} selected — tap a position to move, tap again to cancel.
+            <p className="mt-1 text-[11px] font-semibold text-neutral-500">
+              {selected
+                ? `${nameOf(selected)} selected — tap a position to move, tap again to cancel.`
+                : "Drag a player onto the field (hold a beat on phones), or tap to select."}
+            </p>
+          </div>
+
+          {/* The configurator island: gap fills first, then tune-ups. */}
+          <div className="rounded-lg border border-line bg-paper p-2" data-testid="assist">
+            <span className="text-xs font-bold uppercase">Coach&apos;s assist</span>
+            {orderedGaps.map((slot) => (
+              <p
+                key={slot}
+                className={`mt-1 text-xs font-semibold ${
+                  slot === focusGap ? "rounded bg-amber-50 p-1" : ""
+                }`}
+              >
+                <span className="text-red-700">{slot} is empty.</span>
+                {(gapOptions.get(slot) ?? []).map((o, i) => (
+                  <button
+                    key={`${o.primaryId}-${o.kind}`}
+                    className="ml-1 underline"
+                    onClick={() => void applyMoves(o.moves)}
+                  >
+                    {i === 0 ? "best: " : ""}
+                    {o.kind === "bench"
+                      ? `${nameOf(o.primaryId)} (${o.primaryRating})`
+                      : `${nameOf(o.primaryId)} over (${o.primaryRating}), ${nameOf(o.backfillId!)} to ${o.backfillSlot} (${o.backfillRating})`}
+                  </button>
+                ))}
+              </p>
+            ))}
+            {audit.map((s, i) => (
+              <p key={i} className="mt-1 text-xs font-semibold">
+                {s.kind === "upgrade" && (
+                  <>
+                    {nameOf(s.detail.bId!)} rates {s.detail.bRating} at {s.slot} —{" "}
+                    {nameOf(s.detail.aId!)} is at {s.detail.aRating}.
+                    <button className="ml-1 underline" onClick={() => void applyMoves(s.moves)}>
+                      Sub in
+                    </button>
+                  </>
+                )}
+                {s.kind === "swap" && (
+                  <>
+                    Swap {nameOf(s.detail.aId!)} ↔ {nameOf(s.detail.bId!)} (
+                    {s.detail.aSlot}/{s.detail.bSlot}) — both fit better.
+                    <button className="ml-1 underline" onClick={() => void applyMoves(s.moves)}>
+                      Swap
+                    </button>
+                  </>
+                )}
+                {s.kind === "rest" && (
+                  <span className="text-neutral-600">
+                    {nameOf(s.detail.aId!)} has sat {s.detail.benchInnings} innings — find a spot
+                    soon.
+                  </span>
+                )}
+              </p>
+            ))}
+            {orderedGaps.length === 0 && audit.length === 0 && (
+              <p className="mt-1 text-xs font-semibold text-green-700">
+                No changes suggested — this lineup holds up.
               </p>
             )}
-            {!selected &&
-              POSITIONS.filter((p) => !playerAt.get(p)).map((slot) => (
-                <p key={slot} className="mt-1 text-xs font-semibold">
-                  <span className="text-red-700">{slot} is empty.</span>{" "}
-                  {suggestionsFor(slot).map((s, i) => (
-                    <button
-                      key={s.pid}
-                      className="ml-1 underline"
-                      onClick={() => void doMove(s.pid, slot)}
-                    >
-                      {i === 0 ? "best: " : ""}
-                      {nameOf(s.pid)} ({s.rating})
-                    </button>
-                  ))}
-                </p>
-              ))}
           </div>
-        </div>
-
-        {/* Batting order + counters */}
-        <div className="space-y-3">
           <div className="rounded-lg border border-line bg-paper p-2">
             <span className="text-xs font-bold uppercase">Batting order</span>
             <ol className="mt-1 space-y-0.5 text-sm">
@@ -526,6 +700,16 @@ export function Dashboard(props: Props) {
           </button>
         </div>
       </div>
+
+      {/* Drag ghost: follows the pointer while a chip is in flight. */}
+      {drag?.armed && (
+        <div
+          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-[120%] rounded-lg border-2 border-team-orange bg-paper px-2 py-1 text-sm font-extrabold shadow-lg"
+          style={{ left: drag.x, top: drag.y }}
+        >
+          {nameOf(drag.pid)}
+        </div>
+      )}
     </div>
   );
 }

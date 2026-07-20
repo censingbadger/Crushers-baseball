@@ -202,6 +202,24 @@ const refilled = await page.textContent("main");
 if (refilled?.includes("P is empty")) fail("cascade suggestion did not fill P");
 await page.screenshot({ path: `${SHOTS}/10-dugout.png`, fullPage: true });
 
+// Drag & drop: pull the catcher to the bench with the mouse; the assist
+// island must flag the hole and its best suggestion must refill it.
+const cChip = page.locator("button:has(span:text-is('C'))").first();
+const cBox = await cChip.boundingBox();
+const bBox = await page.locator("[data-drop='BENCH']").boundingBox();
+await page.mouse.move(cBox.x + cBox.width / 2, cBox.y + cBox.height / 2);
+await page.mouse.down();
+await page.mouse.move(bBox.x + 50, bBox.y + 14, { steps: 10 });
+await page.mouse.up();
+await page.waitForTimeout(900);
+const afterDrag = await page.textContent("main");
+if (!afterDrag?.includes("C is empty")) fail("drag to bench did not vacate C");
+if (!afterDrag?.includes("Coach's assist")) fail("assist island missing");
+await page.locator("p:has-text('C is empty') button").first().click();
+await page.waitForTimeout(900);
+const afterAssist = await page.textContent("main");
+if (afterAssist?.includes("C is empty")) fail("assist fill did not refill C");
+
 // Stats: create a manual box score, enter a line, verify derived rates.
 await page.goto(BASE + "/stats");
 await page.fill("#label", "Smoke Scrimmage");
