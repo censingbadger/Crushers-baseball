@@ -419,6 +419,12 @@ if (!gcResult?.match(/2 batting lines/)) fail(`gc portal batting import off: ${g
 if (!gcResult?.match(/1 pitching lines/)) fail("gc portal pitching import off");
 if (!gcResult?.match(/1 fielding lines/)) fail("gc portal fielding import off");
 if (!gcResult?.match(/1 catching lines/)) fail("gc portal catching import off");
+// The tables re-render after the action's revalidate — wait for the
+// per-kind values (which differ from the combined drop's) to land
+// before reading, or this read races the refresh.
+await page.getByText("4.2", { exact: false }).first().waitFor({ timeout: 15000 });
+await page.getByText(".917", { exact: false }).first().waitFor({ timeout: 15000 });
+await page.getByText("21.2", { exact: false }).first().waitFor({ timeout: 15000 });
 const statsAfterGc = await page.textContent("main");
 if (!statsAfterGc?.includes(".500")) fail("GC batting not in tables (Milo 3-for-6 → .500)");
 if (!statsAfterGc?.includes("4.2")) fail("GC pitching not in tables (Leo 4.2 IP)");
