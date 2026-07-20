@@ -134,6 +134,19 @@ const cellCleared = await page
 if (cellCleared?.trim().charAt(0) === "P") fail("depth chart cycle did not clear");
 await page.screenshot({ path: `${SHOTS}/07-depth.png`, fullPage: true });
 
+// Practice stations: with a full demo roster and no never-cells, every
+// station gets at least one kid. (Reason chips need depth-chart calls,
+// which the cycle test above cleared — structure is what we assert.)
+await page.goto(BASE + "/practice");
+const practiceText = await page.textContent("main");
+if (!practiceText?.includes("Practice stations")) fail("practice page incomplete");
+for (const pos of ["SS", "CF", "1B"]) {
+  if (!practiceText?.includes(pos)) fail(`practice grid missing ${pos} station`);
+}
+if (practiceText?.includes("No one to station here"))
+  fail("practice left a station empty with a full roster");
+await page.screenshot({ path: `${SHOTS}/07b-practice.png`, fullPage: true });
+
 // /lineup is retired — it forwards to Game day.
 await page.goto(BASE + "/lineup");
 await page.waitForURL("**/games");
