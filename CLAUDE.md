@@ -27,7 +27,10 @@
   or suggestions). Lineup lab merged into Game day (⚡ Auto-arrange;
   /lineup redirects). Matrix editing = quick entry only (per-coach,
   initials from login); the blended grid is read-only. All roster
-  statuses (practice/hopeful) are game-eligible.
+  statuses (practice/hopeful) are game-eligible. The coach homepage is
+  the four-needs launcher (Game day / Position matrix / Roster / Stats)
+  — no schedule hero or parked-page links for coaches; the event hero
+  is parent-only.
 - **Types over enums**: text columns typed with `$type<...>()` unions.
 - **Theme**: tokens in `src/app/globals.css` (`--color-team-*`); Columbia
   blue primary, orange accent, black borders. Exact shades pending the team

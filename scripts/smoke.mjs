@@ -37,6 +37,16 @@ await page.click("button[type=submit]");
 await page.waitForURL(BASE + "/");
 const heading = await page.textContent("h1");
 if (!heading?.includes("Crushers Blue")) fail(`unexpected dashboard heading: ${heading}`);
+
+// Coach home is the four-needs launcher — no schedule hero, no parked links.
+const homeText = await page.textContent("main");
+for (const need of ["Game day", "Position matrix", "Roster", "Stats"]) {
+  if (!homeText?.includes(need)) fail(`coach home missing "${need}" card`);
+}
+if (!homeText?.includes("Quick entry")) fail("coach home missing quick-entry shortcut");
+if (homeText?.includes("Next up") || homeText?.includes("Full schedule")) {
+  fail("coach home still shows the parked schedule hero");
+}
 await page.screenshot({ path: `${SHOTS}/02-dashboard.png`, fullPage: true });
 
 // Roster shows coach-only guardian contact info.
