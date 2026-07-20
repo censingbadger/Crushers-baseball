@@ -85,16 +85,20 @@ export function NavLinks({ entries }: { entries: NavEntry[] }) {
           const active = groupActive(entry);
           const expanded = openGroup === entry.label;
           return (
-            <div key={entry.label} className="sm:relative">
-              {/* Phone: a plain section label; the group's links list below it. */}
+            <div
+              key={entry.label}
+              className="mt-1.5 border-t border-line pt-1.5 first:mt-0 first:border-t-0 first:pt-0 sm:relative sm:mt-0 sm:border-t-0 sm:pt-0"
+            >
+              {/* Phone: the section header — larger and darker than its
+                  links, so the hierarchy reads parent over child. */}
               <span
-                className={`mt-1 block px-3 text-[11px] font-extrabold uppercase tracking-wide sm:hidden ${
-                  entry.preview ? "text-amber-700" : "text-neutral-500"
+                className={`block px-3 pb-0.5 text-sm font-extrabold uppercase tracking-wide sm:hidden ${
+                  entry.preview ? "text-amber-700" : "text-ink"
                 }`}
               >
                 {entry.label}
                 {entry.preview && (
-                  <span className="ml-1.5 font-bold normal-case text-amber-600">
+                  <span className="ml-1.5 text-[11px] font-bold normal-case text-amber-600">
                     · not in use yet
                   </span>
                 )}
@@ -126,7 +130,7 @@ export function NavLinks({ entries }: { entries: NavEntry[] }) {
                       setOpen(false);
                       setOpenGroup(null);
                     }}
-                    className={`${linkCls(isActive(item.href), item.accent, item.mobileOnly)} sm:!rounded-lg sm:!px-3 sm:!py-1.5`}
+                    className={`${linkCls(isActive(item.href), item.accent, item.mobileOnly)} !pl-6 sm:!rounded-lg sm:!px-3 sm:!pl-3 sm:!py-1.5`}
                   >
                     {item.label}
                   </Link>
