@@ -269,19 +269,31 @@ const gcBatting = [
   "Vance,Milo,6,2,3,1,0,1,4,1,2,1",
   "Brooks,Eli,5,1,1,0,0,0,0,2,1,0",
 ].join("\n");
-const gcPitching = ["Last,First,IP,BF,ER,BB,K,H", "Castillo,Leo,4.2,20,2,3,7,4"].join("\n");
+// Pitching in GC's INN/ERA header style (no IP column) — the variant that
+// slipped past the first detector in the field.
+const gcPitching = [
+  "Last,First,GP,INN,H,R,ER,BB,SO,ERA,WHIP",
+  "Castillo,Leo,3,4.2,4,3,2,3,7,2.57,1.50",
+].join("\n");
+const gcFielding = ["Last,First,TC,PO,A,E,DP,FPCT", "Porter,Max,24,15,7,2,1,.917"].join("\n");
+const gcCatching = ["Last,First,INN,PB,SB,CS,CS%", "Brooks,Eli,21.2,3,7,4,.364"].join("\n");
 await page.locator("[data-testid=gc-portal] input[type=file]").setInputFiles([
   { name: "batting.csv", mimeType: "text/csv", buffer: Buffer.from(gcBatting) },
   { name: "pitching.csv", mimeType: "text/csv", buffer: Buffer.from(gcPitching) },
+  { name: "fielding.csv", mimeType: "text/csv", buffer: Buffer.from(gcFielding) },
+  { name: "catching.csv", mimeType: "text/csv", buffer: Buffer.from(gcCatching) },
 ]);
 await page.locator("[data-testid=gc-result]").waitFor({ timeout: 20000 });
 const gcResult = await page.textContent("[data-testid=gc-result]");
-if (!gcResult?.includes("batting.csv") || !gcResult?.match(/2 batting lines/))
-  fail(`gc portal batting import off: ${gcResult}`);
+if (!gcResult?.match(/2 batting lines/)) fail(`gc portal batting import off: ${gcResult}`);
 if (!gcResult?.match(/1 pitching lines/)) fail("gc portal pitching import off");
+if (!gcResult?.match(/1 fielding lines/)) fail("gc portal fielding import off");
+if (!gcResult?.match(/1 catching lines/)) fail("gc portal catching import off");
 const statsAfterGc = await page.textContent("main");
 if (!statsAfterGc?.includes(".500")) fail("GC batting not in tables (Milo 3-for-6 → .500)");
 if (!statsAfterGc?.includes("4.2")) fail("GC pitching not in tables (Leo 4.2 IP)");
+if (!statsAfterGc?.includes(".917")) fail("GC fielding not in tables (Max FPCT .917)");
+if (!statsAfterGc?.includes("21.2")) fail("GC catching not in tables (Eli 21.2 INN)");
 
 // Coach progress view shows the trend.
 await page.goto(BASE + "/progress");

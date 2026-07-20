@@ -30,8 +30,9 @@ export function GcPortal() {
     <section className="card p-4" data-testid="gc-portal">
       <h2 className="text-lg font-bold">GameChanger drop zone</h2>
       <p className="mt-1 text-sm text-neutral-700">
-        Batting, pitching, or both at once — the app works out which file is
-        which and replaces the previous GameChanger snapshot.
+        Batting, pitching, fielding, catching — drop any or all at once. The
+        app works out which file is which and replaces the previous
+        GameChanger snapshot for each.
       </p>
       <button
         type="button"
@@ -90,11 +91,10 @@ export function GcPortal() {
             Sign in at <b>web.gc.com</b> on a computer and open your team.
           </li>
           <li>
-            Go to <b>Stats</b>, pick the season view, and use <b>Export</b> to
-            download the CSV — once on the batting tab, once on the pitching
-            tab.
+            Go to <b>Stats</b>, pick the season view, and use <b>Export</b> on
+            each tab you want — batting, pitching, fielding, catching.
           </li>
-          <li>Drag both files onto the zone above (together is fine).</li>
+          <li>Drag all the files onto the zone above (together is fine).</li>
         </ol>
         <p className="mt-1 text-neutral-700">
           On a phone: export from the GC app via share → save to Files, then

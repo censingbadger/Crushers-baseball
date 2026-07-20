@@ -78,6 +78,57 @@ export function formatIp(outs: number): string {
   return `${Math.floor(outs / 3)}.${outs % 3}`;
 }
 
+// GameChanger's other two exports: fielding and catching.
+
+export interface FieldingTotals {
+  po: number;
+  a: number;
+  e: number;
+  dp: number;
+}
+
+export interface CatchingTotals {
+  outs: number;
+  pb: number;
+  sbAllowed: number;
+  cs: number;
+}
+
+export const EMPTY_FIELDING: FieldingTotals = { po: 0, a: 0, e: 0, dp: 0 };
+export const EMPTY_CATCHING: CatchingTotals = { outs: 0, pb: 0, sbAllowed: 0, cs: 0 };
+
+export function addFielding(a: FieldingTotals, b: Partial<FieldingTotals>): FieldingTotals {
+  const out = { ...a };
+  for (const key of Object.keys(EMPTY_FIELDING) as (keyof FieldingTotals)[]) {
+    out[key] = a[key] + (b[key] ?? 0);
+  }
+  return out;
+}
+
+export function addCatching(a: CatchingTotals, b: Partial<CatchingTotals>): CatchingTotals {
+  const out = { ...a };
+  for (const key of Object.keys(EMPTY_CATCHING) as (keyof CatchingTotals)[]) {
+    out[key] = a[key] + (b[key] ?? 0);
+  }
+  return out;
+}
+
+export function fieldingRates(t: FieldingTotals) {
+  const chances = t.po + t.a + t.e;
+  return {
+    chances,
+    fpct: chances > 0 ? round3((t.po + t.a) / chances) : null,
+  };
+}
+
+export function catchingRates(t: CatchingTotals) {
+  const attempts = t.sbAllowed + t.cs;
+  return {
+    attempts,
+    csPct: attempts > 0 ? round3(t.cs / attempts) : null,
+  };
+}
+
 /** Parse GC-style IP notation: "3.2" = 3 innings + 2 outs -> 11 outs. */
 export function parseIpToOuts(raw: string | number): number | null {
   const s = String(raw).trim();

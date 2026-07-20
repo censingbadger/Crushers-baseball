@@ -458,6 +458,46 @@ export const pitchingLines = pgTable(
   (t) => [uniqueIndex("pitching_line_once").on(t.statGameId, t.playerId)],
 );
 
+// Fielding and catching season lines (GameChanger's other two exports).
+// Derived rates (FPCT, CS%) compute from these raw counts.
+export const fieldingLines = pgTable(
+  "fielding_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    statGameId: uuid("stat_game_id")
+      .notNull()
+      .references(() => statGames.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    po: integer("po").notNull().default(0),
+    a: integer("a").notNull().default(0),
+    e: integer("e").notNull().default(0),
+    dp: integer("dp").notNull().default(0),
+  },
+  (t) => [uniqueIndex("fielding_line_once").on(t.statGameId, t.playerId)],
+);
+
+export const catchingLines = pgTable(
+  "catching_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    statGameId: uuid("stat_game_id")
+      .notNull()
+      .references(() => statGames.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    /** Innings caught, stored as outs (GC's "3.2" notation parses to 11). */
+    outs: integer("outs").notNull().default(0),
+    pb: integer("pb").notNull().default(0),
+    /** Steal attempts allowed / runners caught stealing. */
+    sbAllowed: integer("sb_allowed").notNull().default(0),
+    cs: integer("cs").notNull().default(0),
+  },
+  (t) => [uniqueIndex("catching_line_once").on(t.statGameId, t.playerId)],
+);
+
 // Monthly parent reports (goal 6). Drafted by Claude (or a deterministic
 // template when no API key is configured) from family-shareable data only,
 // then edited/approved by a coach. Parents never see anything before

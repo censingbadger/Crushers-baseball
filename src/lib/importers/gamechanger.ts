@@ -7,7 +7,7 @@ import { parseIpToOuts } from "@/lib/stats";
 // single name column; stat headers vary slightly by GC version, so columns
 // are matched case- and punctuation-insensitively against known aliases.
 
-export type GcKind = "batting" | "pitching";
+export type GcKind = "batting" | "pitching" | "fielding" | "catching";
 
 const BATTING_COLUMNS: Record<string, string[]> = {
   ab: ["ab"],
@@ -24,15 +24,44 @@ const BATTING_COLUMNS: Record<string, string[]> = {
   sf: ["sf"],
 };
 
+// Columns prefixed "_" are detection-only: they help identify the export
+// (GC always includes them) but aren't stored.
 const PITCHING_COLUMNS: Record<string, string[]> = {
-  ip: ["ip"],
-  bf: ["bf", "tbf"],
-  pitches: ["#p", "p", "pitches", "pc"],
+  ip: ["ip", "inn", "innings"],
+  bf: ["bf", "tbf", "battersfaced"],
+  pitches: ["#p", "p", "pitches", "pc", "np"],
   h: ["h", "hits"],
   r: ["r", "runs"],
   er: ["er"],
   bb: ["bb", "walks"],
   k: ["so", "k", "ks"],
+  _era: ["era"],
+  _whip: ["whip"],
+  _gp: ["gp", "app", "g"],
+};
+
+const FIELDING_COLUMNS: Record<string, string[]> = {
+  po: ["po", "putouts"],
+  a: ["a", "assists"],
+  e: ["e", "errors"],
+  dp: ["dp"],
+  _tc: ["tc", "chances"],
+  _fpct: ["fpct", "fld%", "fldpct"],
+};
+
+const CATCHING_COLUMNS: Record<string, string[]> = {
+  ip: ["inn", "ip", "innings"],
+  pb: ["pb", "passedballs"],
+  sbAllowed: ["sb", "sba"],
+  cs: ["cs"],
+  _cspct: ["cs%", "cspct"],
+};
+
+const SPEC_BY_KIND: Record<GcKind, Record<string, string[]>> = {
+  batting: BATTING_COLUMNS,
+  pitching: PITCHING_COLUMNS,
+  fielding: FIELDING_COLUMNS,
+  catching: CATCHING_COLUMNS,
 };
 
 export interface GcLine {
@@ -72,18 +101,24 @@ function bestHeaderMatch(grid: string[][], spec: Record<string, string[]>): numb
 }
 
 /**
- * Which export is this file? Both kinds share H/R/BB/K columns, so lines
- * can parse under either spec — the reliable signal is which spec matches
- * MORE header columns (IP/BF/ER pull pitching, AB/2B/HR/RBI pull batting).
+ * Which export is this file? The kinds share columns (H/R/BB/K between
+ * batting and pitching, SB between batting and catching), so the reliable
+ * signal is which spec matches MORE header columns — IP/BF/ER/ERA pull
+ * pitching, AB/2B/HR/RBI pull batting, PO/A/E pull fielding, PB/CS pull
+ * catching. Ties and thin matches return null rather than a guess.
  */
 export function detectGcKind(csv: string): GcKind | null {
   const grid = Papa.parse<string[]>(csv.replace(/^﻿/, "").trim(), {
     skipEmptyLines: true,
   }).data;
-  const batting = bestHeaderMatch(grid, BATTING_COLUMNS);
-  const pitching = bestHeaderMatch(grid, PITCHING_COLUMNS);
-  if ((batting < 3 && pitching < 3) || batting === pitching) return null;
-  return batting > pitching ? "batting" : "pitching";
+  const scores = (Object.keys(SPEC_BY_KIND) as GcKind[]).map((kind) => ({
+    kind,
+    score: bestHeaderMatch(grid, SPEC_BY_KIND[kind]),
+  }));
+  scores.sort((a, b) => b.score - a.score);
+  const [best, second] = scores;
+  if (best.score < 3 || best.score === second.score) return null;
+  return best.kind;
 }
 
 export function parseGameChangerCsv(
@@ -96,7 +131,7 @@ export function parseGameChangerCsv(
     skipEmptyLines: true,
   });
   const grid = parsed.data;
-  const spec = kind === "batting" ? BATTING_COLUMNS : PITCHING_COLUMNS;
+  const spec = SPEC_BY_KIND[kind];
 
   // Header row: the first row that matches at least three known stat columns.
   let headerIdx = -1;
@@ -122,7 +157,9 @@ export function parseGameChangerCsv(
     };
   }
   const header = grid[headerIdx].map(norm);
-  const missing = Object.keys(spec).filter((k) => !(k in colMap));
+  const missing = Object.keys(spec).filter(
+    (k) => !k.startsWith("_") && !(k in colMap),
+  );
   if (missing.length > 0) {
     warnings.push(`Columns not found (imported as 0): ${missing.join(", ")}.`);
   }
@@ -159,6 +196,7 @@ export function parseGameChangerCsv(
 
     const stats: Record<string, number> = {};
     for (const [key, idx] of Object.entries(colMap)) {
+      if (key.startsWith("_")) continue; // detection-only column
       const raw = row[idx] ?? "";
       if (key === "ip") {
         stats.outs = parseIpToOuts(raw) ?? 0;
