@@ -32,6 +32,9 @@ const PARENT_ENTRIES: NavEntry[] = [
   SETTINGS,
 ];
 
+// Mike's slim menu (screenshot, 2026-07-20): the working set is Game day,
+// Roster, and the Performance group — everything else, planning and admin
+// included, sits in Future preview until it's needed.
 const COACH_ENTRIES: NavEntry[] = [
   { href: "/games", label: "Game day", accent: true },
   { href: "/roster", label: "Roster" },
@@ -43,21 +46,6 @@ const COACH_ENTRIES: NavEntry[] = [
       { href: "/rate", label: "Player feedback" },
       { href: "/stats", label: "Stats" },
       { href: "/reports", label: "Reports" },
-    ],
-  },
-  {
-    label: "Planning",
-    items: [
-      { href: "/weekend", label: "Weekend" },
-      { href: "/practice", label: "Practice stations" },
-      { href: "/drills", label: "Drills" },
-    ],
-  },
-  {
-    label: "Admin",
-    items: [
-      { href: "/families", label: "Families" },
-      { href: "/import", label: "Import" },
     ],
   },
   FUTURE,
