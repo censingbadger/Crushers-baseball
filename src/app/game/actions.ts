@@ -7,8 +7,14 @@ import { z } from "zod";
 import { getDb, tables } from "@/db";
 import { POSITIONS } from "@/db/schema";
 import { requireCoach } from "@/lib/auth";
-import { getRoster, getRsvpsForEvents } from "@/lib/data";
+import { getPositionRoles, getRoster, getRsvpsForEvents } from "@/lib/data";
 import { blendedLookup, getCurrentRatings } from "@/lib/matrix";
+import {
+  aspiringTokens,
+  rolesByPlayerFrom,
+  solverWeights,
+  type LineupMode,
+} from "@/lib/depth";
 import { solveLineup, type LineupCandidate } from "@/lib/lineup";
 import { BENCH, planMove, type Slot } from "@/lib/gameday";
 import { pitchEligibility, type DayPitches } from "@/lib/pitchsmart";
@@ -19,6 +25,17 @@ function isoDateOf(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+function ratingsRecordOf(
+  playerIds: readonly string[],
+  blended: Map<string, Map<string, number>>,
+): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {};
+  for (const pid of playerIds) {
+    out[pid] = Object.fromEntries(blended.get(pid) ?? new Map());
+  }
+  return out;
 }
 
 const createSchema = z.object({
@@ -83,7 +100,14 @@ export async function createGame(formData: FormData): Promise<void> {
     name: `${p.firstName} ${p.lastName}`,
     ratings: blended.get(p.playerId) ?? new Map(),
   }));
-  const solution = solveLineup(candidates);
+  const poolIds = pool.map((p) => p.playerId);
+  const weights = solverWeights(
+    poolIds,
+    ratingsRecordOf(poolIds, blended),
+    rolesByPlayerFrom(await getPositionRoles(event.seasonId)),
+    "compete",
+  );
+  const solution = solveLineup(candidates, {}, weights);
 
   const [game] = await db
     .insert(tables.liveGames)
@@ -426,7 +450,10 @@ export async function swapBattingSpot(
  * the players in this game and apply it from the current inning onward.
  * Bench falls out of the solve (extra players sit).
  */
-export async function autoArrangeField(gameId: string): Promise<{ ok: boolean }> {
+export async function autoArrangeField(
+  gameId: string,
+  mode: LineupMode = "compete",
+): Promise<{ ok: boolean }> {
   await requireCoach();
   const db = await getDb();
   const [game] = await db
@@ -457,7 +484,34 @@ export async function autoArrangeField(gameId: string): Promise<{ ok: boolean }>
     name: nameOf.get(id) ?? "?",
     ratings: blended.get(id) ?? new Map(),
   }));
-  const solution = solveLineup(candidates);
+
+  // Depth-chart roles + mode steer the arrangement; the kids' own ★
+  // positions pull only in develop mode (the bonus is mode-gated).
+  const aspRows = await db
+    .select({
+      playerId: tables.aspirations.playerId,
+      desiredPositions: tables.aspirations.desiredPositions,
+    })
+    .from(tables.aspirations)
+    .where(eq(tables.aspirations.seasonId, game.seasonId));
+  const aspiringByPlayer: Record<string, string[]> = {};
+  for (const row of aspRows) {
+    const tokens = aspiringTokens(row.desiredPositions);
+    if (tokens.length > 0) aspiringByPlayer[row.playerId] = tokens;
+  }
+  const weights = solverWeights(
+    playerIds,
+    ratingsRecordOf(playerIds, blended),
+    rolesByPlayerFrom(await getPositionRoles(game.seasonId)),
+    mode,
+    aspiringByPlayer,
+  );
+  // Pitch Smart trumps everything: a resting arm never auto-lands at P.
+  for (const pid of playerIds) {
+    const e = pitchEligibility(await pitchHistory(pid), game.gameDate);
+    if (!e.eligible) weights[pid].P = 0;
+  }
+  const solution = solveLineup(candidates, {}, weights);
 
   const assigned = new Map<string, string>();
   for (const pos of POSITIONS) {

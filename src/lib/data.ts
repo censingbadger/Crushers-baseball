@@ -52,6 +52,19 @@ export async function getRoster(seasonId: string): Promise<RosterPlayer[]> {
   return rows;
 }
 
+/** The staff's shared depth-chart roles for a season (all players). */
+export async function getPositionRoles(seasonId: string) {
+  const db = await getDb();
+  return db
+    .select({
+      playerId: tables.positionRoles.playerId,
+      position: tables.positionRoles.position,
+      role: tables.positionRoles.role,
+    })
+    .from(tables.positionRoles)
+    .where(eq(tables.positionRoles.seasonId, seasonId));
+}
+
 export async function getGuardiansByPlayer(playerIds: string[]) {
   if (playerIds.length === 0) {
     return new Map<

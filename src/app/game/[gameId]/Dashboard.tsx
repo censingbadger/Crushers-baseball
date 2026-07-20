@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   addPitches,
@@ -11,6 +12,7 @@ import {
   swapBattingSpot,
 } from "@/app/game/actions";
 import { BENCH } from "@/lib/gameday";
+import { roleWeights, type LineupMode, type RolesByPlayer } from "@/lib/depth";
 import { auditLineup, gapFillOptions, positionDepth, type Move } from "@/lib/recommend";
 
 const POSITIONS = ["P", "C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"] as const;
@@ -118,6 +120,8 @@ interface Props {
   gamePitchesByPlayer: Record<string, number>;
   eligibility: Record<string, { eligible: boolean; remaining: number; reason: string | null }>;
   ratingsByPlayer: Record<string, Record<string, number>>;
+  /** The staff's shared depth-chart roles (playerId -> position -> role). */
+  rolesByPlayer: RolesByPlayer;
   /** playerId -> positions the kid's aspirations name (e.g. ["SS","P"]). */
   aspiringByPlayer: Record<string, string[]>;
   /** playerId -> season bench share (0..1) — the fairness number. */
@@ -136,6 +140,9 @@ export function Dashboard(props: Props) {
   // Dugout-board mode: the player-safe view — just the field and the
   // batting order, no ratings, suggestions, or pitch numbers on display.
   const [board, setBoard] = useState(false);
+  // Game context: "compete" ranks by role & ability for a close game;
+  // "develop" hands the develop spots and the kids' ★ picks the reps.
+  const [mode, setMode] = useState<LineupMode>("compete");
   // The slot a move just vacated — the assist island leads with it.
   const [focusGap, setFocusGap] = useState<string | null>(null);
   // The slot a move just filled — the island shows its depth chart.
@@ -299,19 +306,35 @@ export function Dashboard(props: Props) {
         : [...emptySlots],
     [emptySlots, focusGap],
   );
+  // Role-aware decision weights: suggestions rank on ability × role for
+  // the current mode; the numbers shown stay raw ratings.
+  const weights = useMemo(
+    () =>
+      roleWeights(
+        players.map((p) => p.id),
+        props.ratingsByPlayer,
+        props.rolesByPlayer,
+        mode,
+        props.aspiringByPlayer,
+      ),
+    [players, props.ratingsByPlayer, props.rolesByPlayer, mode, props.aspiringByPlayer],
+  );
   const gapOptions = useMemo(
     () =>
       new Map(
-        orderedGaps.map((slot) => [slot, gapFillOptions(slot, current, props.ratingsByPlayer)]),
+        orderedGaps.map((slot) => [
+          slot,
+          gapFillOptions(slot, current, props.ratingsByPlayer, weights),
+        ]),
       ),
-    [orderedGaps, current, props.ratingsByPlayer],
+    [orderedGaps, current, props.ratingsByPlayer, weights],
   );
   const audit = useMemo(
     () =>
-      auditLineup(current, props.ratingsByPlayer, props.benchInningsByPlayer).filter(
+      auditLineup(current, props.ratingsByPlayer, props.benchInningsByPlayer, weights).filter(
         (s) => s.kind !== "gap", // gaps get their richer treatment above
       ),
-    [current, props.ratingsByPlayer, props.benchInningsByPlayer],
+    [current, props.ratingsByPlayer, props.benchInningsByPlayer, weights],
   );
 
   const ratingChip = (pid: string, slot: string) =>
@@ -324,10 +347,21 @@ export function Dashboard(props: Props) {
   const depth = useMemo(
     () =>
       depthSlot
-        ? positionDepth(depthSlot, current, props.ratingsByPlayer, props.aspiringByPlayer)
+        ? positionDepth(
+            depthSlot,
+            current,
+            props.ratingsByPlayer,
+            props.aspiringByPlayer,
+            4,
+            weights,
+            props.rolesByPlayer,
+          )
         : [],
-    [depthSlot, current, props.ratingsByPlayer, props.aspiringByPlayer],
+    [depthSlot, current, props.ratingsByPlayer, props.aspiringByPlayer, weights, props.rolesByPlayer],
   );
+
+  const roleAt = (pid: string, slot: string): string | undefined =>
+    (props.rolesByPlayer[pid] as Record<string, string> | undefined)?.[slot];
 
   // Gray ghost on an empty slot: the best one-move (bench) fill.
   const ghostFor = (slot: string) =>
@@ -364,13 +398,37 @@ export function Dashboard(props: Props) {
         </div>
         <span className="ml-auto flex items-center gap-2">
           {!board && (
+            <span
+              className="flex overflow-hidden rounded-lg border border-line text-xs font-bold"
+              title="Close game: strongest arrangement by role and ability. Up big: develop spots and the kids' ★ picks get the reps."
+              data-testid="mode-toggle"
+            >
+              <button
+                className={`px-2.5 py-1.5 ${mode === "compete" ? "bg-team-blue" : "bg-paper text-neutral-500"}`}
+                onClick={() => setMode("compete")}
+              >
+                Close game
+              </button>
+              <button
+                className={`px-2.5 py-1.5 ${mode === "develop" ? "bg-team-orange" : "bg-paper text-neutral-500"}`}
+                onClick={() => setMode("develop")}
+              >
+                Up big
+              </button>
+            </span>
+          )}
+          {!board && (
             <button
               className="btn text-sm"
               disabled={pending || busy}
               onClick={() => {
-                if (!window.confirm("Auto-arrange the strongest field for this inning onward? Current positions will be rearranged; you can still drag anyone after.")) return;
+                const ask =
+                  mode === "compete"
+                    ? "Auto-arrange the strongest field for this inning onward? Current positions will be rearranged; you can still drag anyone after."
+                    : "Auto-arrange for development? Develop spots and ★ picks get the field; you can still drag anyone after.";
+                if (!window.confirm(ask)) return;
                 startTransition(async () => {
-                  await autoArrangeField(game.id);
+                  await autoArrangeField(game.id, mode);
                   router.refresh();
                 });
               }}
@@ -434,8 +492,13 @@ export function Dashboard(props: Props) {
                 >
                   <span className="block text-[11px] font-bold uppercase opacity-70">
                     {pos}
-                    {/* While dragging (coach view): the dragged player's fit. */}
-                    {!board && drag?.armed && ` · ${ratingChip(drag.pid, pos)}`}
+                    {/* While dragging (coach view): the dragged player's fit,
+                        or the hard stop when the staff marked "never here". */}
+                    {!board &&
+                      drag?.armed &&
+                      (roleAt(drag.pid, pos) === "never"
+                        ? " · 🚫 never"
+                        : ` · ${ratingChip(drag.pid, pos)}`)}
                   </span>
                   <span className={`block font-extrabold leading-tight ${board ? "text-base" : "text-sm"}`}>
                     {pid ? nameOf(pid) : "—"}
@@ -549,7 +612,12 @@ export function Dashboard(props: Props) {
               Coach view only — the dugout board stays evaluation-free. */}
           {!board && (
           <div className="rounded-lg border border-line bg-paper p-2" data-testid="assist">
-            <span className="text-xs font-bold uppercase">Coach&apos;s assist</span>
+            <span className="flex items-baseline justify-between">
+              <span className="text-xs font-bold uppercase">Coach&apos;s assist</span>
+              <Link href="/depth" className="text-[11px] font-semibold underline">
+                ✎ Depth chart
+              </Link>
+            </span>
             {depthSlot && depth.length > 0 && (
               <div className="mt-1 rounded bg-team-blue-light/60 p-1.5 text-xs">
                 <p className="font-bold">{depthSlot} depth</p>
@@ -563,6 +631,19 @@ export function Dashboard(props: Props) {
                     {!d.holder && (
                       <span className="text-neutral-500">
                         {" "}· {d.where === BENCH ? "bench" : d.where}
+                      </span>
+                    )}
+                    {d.role && (
+                      <span
+                        className={`ml-1 rounded border border-line px-1 text-[10px] font-bold uppercase ${
+                          d.role === "never"
+                            ? "bg-red-100 text-red-700"
+                            : d.role === "primary"
+                              ? "bg-team-blue"
+                              : "bg-paper"
+                        }`}
+                      >
+                        {d.role}
                       </span>
                     )}
                     {d.aspiring && (

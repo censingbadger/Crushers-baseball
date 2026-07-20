@@ -266,6 +266,38 @@ export const aspirations = pgTable(
   (t) => [uniqueIndex("aspiration_once").on(t.seasonId, t.playerId)],
 );
 
+// Depth-chart roles: the staff's shared "should they play there" call per
+// player+position — distinct from ability ratings, which say how WELL
+// they'd play it. A blank cell simply has no row.
+export const POSITION_ROLES = [
+  "primary",
+  "secondary",
+  "develop",
+  "emergency",
+  "never",
+] as const;
+export type PositionRoleKind = (typeof POSITION_ROLES)[number];
+
+export const positionRoles = pgTable(
+  "position_roles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => seasons.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    position: text("position").$type<Position>().notNull(),
+    role: text("role").$type<PositionRoleKind>().notNull(),
+    updatedBy: text("updated_by"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("position_role_once").on(t.seasonId, t.playerId, t.position),
+  ],
+);
+
 // Weekend innings allocation (goal 3): plan each player's innings across a
 // tournament weekend before drawing per-game lineups. Mirrors the coach's
 // planning spreadsheet: two field positions plus pitching innings per

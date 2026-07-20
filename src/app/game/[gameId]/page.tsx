@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { eq, inArray } from "drizzle-orm";
 import { getDb, tables } from "@/db";
-import { POSITIONS } from "@/db/schema";
 import { requireCoach } from "@/lib/auth";
+import { getPositionRoles } from "@/lib/data";
+import { aspiringTokens, rolesByPlayerFrom } from "@/lib/depth";
 import { benchInnings } from "@/lib/gameday";
 import { computeSeasonUsage } from "@/lib/usage";
 import { gameSnapshot } from "@/app/game/actions";
@@ -71,14 +72,13 @@ export default async function GamePage({
     .where(eq(tables.aspirations.seasonId, game.seasonId));
   const aspiringByPlayer: Record<string, string[]> = {};
   for (const row of aspRows) {
-    const tokens = (row.desiredPositions ?? "")
-      .toUpperCase()
-      .split(/[^A-Z0-9]+/)
-      .filter((t): t is (typeof POSITIONS)[number] =>
-        (POSITIONS as readonly string[]).includes(t),
-      );
+    const tokens = aspiringTokens(row.desiredPositions);
     if (tokens.length > 0) aspiringByPlayer[row.playerId] = tokens;
   }
+
+  // The staff's depth-chart roles — the "should they play there" layer the
+  // dugout suggestions rank with.
+  const rolesByPlayer = rolesByPlayerFrom(await getPositionRoles(game.seasonId));
 
   return (
     <div>
@@ -106,6 +106,7 @@ export default async function GamePage({
         gamePitchesByPlayer={gamePitchesByPlayer}
         eligibility={snap.eligibility}
         ratingsByPlayer={snap.ratingsByPlayer}
+        rolesByPlayer={rolesByPlayer}
         aspiringByPlayer={aspiringByPlayer}
         seasonSatShareByPlayer={seasonSatShareByPlayer}
         score={scoreRows.map((s) => ({ inning: s.inning, side: s.side, runs: s.runs }))}
