@@ -9,6 +9,7 @@ import { POSITIONS } from "@/db/schema";
 import { requireCoach } from "@/lib/auth";
 import { getPositionRoles, getRoster, getRsvpsForEvents } from "@/lib/data";
 import { blendedLookup, getCurrentRatings } from "@/lib/matrix";
+import { barsSummary } from "@/lib/bars";
 import {
   aspiringTokens,
   rolesByPlayerFrom,
@@ -563,8 +564,17 @@ export async function applySuggestedBattingOrder(
   if (orderRows.length === 0) return { ok: false, notes: ["No batters in this game yet."] };
   const batterIds = orderRows.map((o) => o.playerId);
 
-  const [battingByPlayer, ratingRows, players] = await Promise.all([
+  const [battingByPlayer, barsRows, legacyRows, players] = await Promise.all([
     getSeasonBattingByPlayer(game.seasonId),
+    db
+      .select()
+      .from(tables.barsRatings)
+      .where(
+        and(
+          eq(tables.barsRatings.seasonId, game.seasonId),
+          eq(tables.barsRatings.dimension, "d1"),
+        ),
+      ),
     db
       .select({
         playerId: tables.playerRatings.playerId,
@@ -588,10 +598,20 @@ export async function applySuggestedBattingOrder(
       .where(inArray(tables.players.id, batterIds)),
   ]);
 
-  // Latest hitting rating per player.
+  // Coach hitting quality: BARS D1 medians once the staff has any (the
+  // current instrument), the legacy 1–10 hitting rows otherwise. Season-
+  // wide switch, never per-player — the blend normalizes within the team,
+  // and mixing a 1–5 median with a 1–10 rating in one solve would skew it.
   const hittingByPlayer = new Map<string, number>();
-  for (const r of ratingRows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())) {
-    hittingByPlayer.set(r.playerId, r.rating);
+  if (barsRows.length > 0) {
+    for (const [pid, cells] of barsSummary(barsRows)) {
+      const d1 = cells.get("d1");
+      if (d1) hittingByPlayer.set(pid, d1.median);
+    }
+  } else {
+    for (const r of legacyRows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())) {
+      hittingByPlayer.set(r.playerId, r.rating);
+    }
   }
 
   const inputs: BatterInput[] = batterIds.map((pid) => ({
