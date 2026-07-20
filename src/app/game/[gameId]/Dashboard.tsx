@@ -152,7 +152,7 @@ function Clock({ startedAtMs, clockMinutes }: { startedAtMs: number | null; cloc
 export function Dashboard(props: Props) {
   const { game, players, current, eligibility } = props;
   const router = useRouter();
-  const [, startTransition] = useTransition();
+  const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState<string | null>(null);
   const [warning, setWarning] = useState<{ playerId: string; target: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -235,27 +235,34 @@ export function Dashboard(props: Props) {
       <div className="card flex flex-wrap items-center gap-3 p-3">
         <div className="flex items-center gap-1">
           <button
-            className="btn px-2 py-0.5"
+            className="btn px-3 py-1.5"
             onClick={() => startTransition(async () => { await setInning(game.id, game.currentInning - 1); router.refresh(); })}
-            disabled={game.currentInning <= 1}
+            disabled={pending || game.currentInning <= 1}
           >
             ◀
           </button>
-          <span className="min-w-16 text-center text-lg font-extrabold">Inn {game.currentInning}</span>
+          <span className="min-w-16 text-center text-lg font-extrabold">
+            Inn {game.currentInning}
+            {game.currentInning > game.innings && (
+              <span className="ml-1 align-middle text-[11px] font-bold uppercase text-team-orange-dark">extra</span>
+            )}
+          </span>
           <button
-            className="btn px-2 py-0.5"
+            className="btn px-3 py-1.5"
             onClick={() => startTransition(async () => { await setInning(game.id, game.currentInning + 1); router.refresh(); })}
+            disabled={pending || game.currentInning >= 9}
           >
             ▶
           </button>
         </div>
         <button
-          className="btn px-3 py-0.5 font-mono text-lg"
+          className="btn px-3 py-1.5 font-mono text-lg"
           title="Tap to add an out"
+          disabled={pending}
           onClick={() => startTransition(async () => { await cycleOuts(game.id); router.refresh(); })}
         >
-          {"●".repeat(game.outs)}
-          {"○".repeat(3 - game.outs)}
+          {"●".repeat(Math.min(3, game.outs))}
+          {"○".repeat(Math.max(0, 3 - game.outs))}
         </button>
         <Clock startedAtMs={game.startedAtMs} clockMinutes={game.clockMinutes} />
         <span className="ml-auto flex items-center gap-2">
@@ -325,12 +332,12 @@ export function Dashboard(props: Props) {
                         : "border-ink bg-paper"
                   } ${selected && !sel ? "ring-2 ring-team-orange" : ""}`}
                 >
-                  <span className="block text-[10px] font-bold uppercase opacity-70">{pos}</span>
+                  <span className="block text-[11px] font-bold uppercase opacity-70">{pos}</span>
                   <span className="block text-sm font-extrabold leading-tight">
                     {pid ? nameOf(pid) : "—"}
                   </span>
                   {pos === "P" && pid && (
-                    <span className="block text-[10px] font-semibold">
+                    <span className="block text-[11px] font-semibold">
                       {props.gamePitchesByPlayer[pid] ?? 0} p · {eligibility[pid]?.remaining ?? 0} left
                     </span>
                   )}
@@ -388,7 +395,7 @@ export function Dashboard(props: Props) {
                   }`}
                 >
                   {nameOf(pid)}
-                  <span className="ml-1 text-[10px] font-semibold opacity-70">
+                  <span className="ml-1 text-[11px] font-semibold opacity-70">
                     {props.benchInningsByPlayer[pid] ?? 0} inn sat
                   </span>
                   {!eligibility[pid]?.eligible && <span title={eligibility[pid]?.reason ?? ""}> 🚫P</span>}
@@ -436,18 +443,18 @@ export function Dashboard(props: Props) {
                 <li key={o.playerId} className="flex items-center gap-1">
                   <span className="w-5 text-right font-mono text-xs">{i + 1}.</span>
                   <span className="flex-1 font-semibold">{nameOf(o.playerId)}</span>
-                  <span className="text-[10px] text-neutral-500">
+                  <span className="text-[11px] text-neutral-500">
                     {current[o.playerId] === BENCH ? "bench" : current[o.playerId]}
                   </span>
                   <button
-                    className="rounded border border-line px-1 text-xs"
+                    className="rounded-lg border border-line-strong px-2.5 py-1.5 text-sm leading-none"
                     onClick={() => startTransition(async () => { await swapBattingSpot(game.id, o.playerId, "up"); router.refresh(); })}
                     disabled={i === 0}
                   >
                     ↑
                   </button>
                   <button
-                    className="rounded border border-line px-1 text-xs"
+                    className="rounded-lg border border-line-strong px-2.5 py-1.5 text-sm leading-none"
                     onClick={() => startTransition(async () => { await swapBattingSpot(game.id, o.playerId, "down"); router.refresh(); })}
                     disabled={i === props.battingOrder.length - 1}
                   >
@@ -472,7 +479,7 @@ export function Dashboard(props: Props) {
 
       {/* Box score strip */}
       <div className="card overflow-x-auto p-3">
-        <table className="w-full min-w-[420px] text-center text-sm">
+        <table className="w-full min-w-[360px] text-center text-sm">
           <thead>
             <tr className="border-b border-line-strong">
               <th className="py-1 text-left">Box</th>

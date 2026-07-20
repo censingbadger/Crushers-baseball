@@ -49,15 +49,14 @@ export async function SiteHeader() {
         </Link>
         {user && (
           <>
-            <NavLinks items={items} />
-            <div className="ml-auto flex items-center gap-2 text-sm">
+            <div className="ml-auto flex items-center gap-2 text-sm sm:order-last sm:ml-0">
               <span className="hidden font-semibold sm:inline">
                 {user.displayName}
                 {user.role === "coach" && (
                   <span className="chip ml-1.5 bg-ink text-paper">Coach</span>
                 )}
               </span>
-              <Link className="btn px-2.5 py-1 text-xs" href="/account">
+              <Link className="btn hidden px-2.5 py-1 text-xs sm:inline-flex" href="/account">
                 Settings
               </Link>
               <form action={logout}>
@@ -66,6 +65,11 @@ export async function SiteHeader() {
                 </button>
               </form>
             </div>
+            {/* On phones the nav collapses behind ☰ (Settings moves inside);
+                from sm up it's the familiar inline pill row. */}
+            <NavLinks
+              items={[...items, { href: "/account", label: "Settings", mobileOnly: true }]}
+            />
           </>
         )}
       </div>

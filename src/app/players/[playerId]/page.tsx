@@ -109,7 +109,7 @@ export default async function PlayerPage({
         .select()
         .from(tables.workoutLogs)
         .where(inArray(tables.workoutLogs.playerId, rosterIds))
-        .orderBy(desc(tables.workoutLogs.day)),
+        .orderBy(desc(tables.workoutLogs.day), desc(tables.workoutLogs.createdAt)),
       db.select().from(tables.playerPages).where(inArray(tables.playerPages.playerId, rosterIds)),
     ]);
 

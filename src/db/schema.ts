@@ -135,6 +135,9 @@ export const users = pgTable("users", {
   displayName: text("display_name").notNull(),
   role: text("role").$type<UserRole>().notNull(),
   guardianId: uuid("guardian_id").references(() => guardians.id),
+  // Bumped on password change / access revoke: session cookies carry the
+  // epoch they were issued under, so old cookies die immediately.
+  sessionEpoch: integer("session_epoch").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -24,6 +24,9 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     .where(eq(tables.users.id, session.userId))
     .limit(1);
   if (!user) return null;
+  // Cookies issued before the user's current epoch are dead — this is what
+  // makes password changes and access revokes take effect immediately.
+  if ((session.epoch ?? 0) !== user.sessionEpoch) return null;
   return {
     id: user.id,
     email: user.email,

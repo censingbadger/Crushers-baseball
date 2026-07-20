@@ -169,6 +169,42 @@ export async function setInning(gameId: string, inning: number): Promise<void> {
   if (!game) return;
   const clamped = Math.max(1, Math.min(9, Math.round(inning)));
   const db = await getDb();
+
+  // Extra innings: entering an inning that was never seeded (beyond the
+  // configured length) carries the previous alignment forward, so the
+  // field never silently empties.
+  const [hasAssignments] = await db
+    .select({ id: tables.gameAssignments.id })
+    .from(tables.gameAssignments)
+    .where(
+      and(
+        eq(tables.gameAssignments.gameId, gameId),
+        eq(tables.gameAssignments.inning, clamped),
+      ),
+    )
+    .limit(1);
+  if (!hasAssignments && clamped > 1) {
+    const previous = await db
+      .select()
+      .from(tables.gameAssignments)
+      .where(
+        and(
+          eq(tables.gameAssignments.gameId, gameId),
+          eq(tables.gameAssignments.inning, clamped - 1),
+        ),
+      );
+    if (previous.length > 0) {
+      await db.insert(tables.gameAssignments).values(
+        previous.map((a) => ({
+          gameId,
+          inning: clamped,
+          playerId: a.playerId,
+          position: a.position,
+        })),
+      );
+    }
+  }
+
   await db
     .update(tables.liveGames)
     .set({ currentInning: clamped, outs: 0 })
@@ -181,9 +217,10 @@ export async function cycleOuts(gameId: string): Promise<void> {
   const game = await loadGame(gameId);
   if (!game) return;
   const db = await getDb();
+  // 0 → 1 → 2 → 3 (shown) → 0: the third out is visible, not swallowed.
   await db
     .update(tables.liveGames)
-    .set({ outs: (game.outs + 1) % 3 })
+    .set({ outs: (game.outs + 1) % 4 })
     .where(eq(tables.liveGames.id, gameId));
   revalidatePath(`/game/${gameId}`);
 }

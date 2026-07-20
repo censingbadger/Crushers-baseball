@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getDb, tables } from "@/db";
 import { editablePlayerIds, requireUser } from "@/lib/auth";
+import { issueSession } from "@/app/auth-actions";
 
 export async function changeOwnPassword(formData: FormData): Promise<void> {
   const user = await requireUser();
@@ -24,10 +25,17 @@ export async function changeOwnPassword(formData: FormData): Promise<void> {
   if (!row?.passwordHash || !bcrypt.compareSync(current, row.passwordHash)) {
     redirect("/account?error=current");
   }
-  await db
+  // Bumping the epoch kills every other session for this account; the
+  // fresh cookie keeps the person who changed the password signed in.
+  const [updated] = await db
     .update(tables.users)
-    .set({ passwordHash: bcrypt.hashSync(next, 10) })
-    .where(eq(tables.users.id, user.id));
+    .set({
+      passwordHash: bcrypt.hashSync(next, 10),
+      sessionEpoch: sql`${tables.users.sessionEpoch} + 1`,
+    })
+    .where(eq(tables.users.id, user.id))
+    .returning({ sessionEpoch: tables.users.sessionEpoch });
+  await issueSession(user.id, updated.sessionEpoch);
   redirect("/account?saved=password");
 }
 

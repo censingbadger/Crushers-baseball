@@ -133,7 +133,7 @@ export default async function AvailabilityPage() {
                   {dayList.map((day) => (
                     <th
                       key={day}
-                      className="border border-line px-1 py-1 text-center text-[10px] font-bold"
+                      className="border border-line px-1 py-1 text-center text-[11px] font-bold"
                     >
                       {formatIsoDay(day)}
                       {isCoach && (
@@ -155,7 +155,7 @@ export default async function AvailabilityPage() {
                     <td className="sticky left-0 bg-paper py-1 pr-2 font-semibold whitespace-nowrap">
                       {p.firstName} {p.lastName}
                       {p.status !== "full" && (
-                        <span className="ml-1 text-[10px] font-bold uppercase text-neutral-500">
+                        <span className="ml-1 text-[11px] font-bold uppercase text-neutral-500">
                           {p.status === "practice" ? "practice" : "hopeful"}
                         </span>
                       )}
@@ -171,12 +171,12 @@ export default async function AvailabilityPage() {
                               value={`${p.playerId}|${day}|${nextStatus(status)}`}
                               data-cell={`${p.playerId}|${day}`}
                               title={`${p.firstName} — ${formatIsoDay(day)}: tap to change`}
-                              className={`block w-full cursor-pointer px-1.5 py-1 text-xs font-bold hover:opacity-80 ${face.cls}`}
+                              className={`block min-h-8 w-full min-w-8 cursor-pointer px-1.5 py-2 text-xs font-bold hover:opacity-80 ${face.cls}`}
                             >
                               {face.label}
                             </button>
                           ) : (
-                            <span className={`block px-1.5 py-1 text-xs font-bold ${face.cls}`}>
+                            <span className={`block min-h-8 px-1.5 py-2 text-xs font-bold ${face.cls}`}>
                               {face.label}
                             </span>
                           )}
@@ -230,7 +230,7 @@ export default async function AvailabilityPage() {
                   {events.map((e) => (
                     <th
                       key={e.id}
-                      className="border border-line px-1 py-1 text-center text-[10px] font-bold"
+                      className="border border-line px-1 py-1 text-center text-[11px] font-bold"
                     >
                       <div>{formatEventDate(e.startsAt)}</div>
                       <div className="font-normal uppercase text-neutral-500">
@@ -257,12 +257,12 @@ export default async function AvailabilityPage() {
                               value={`${e.id}|${p.playerId}|${nextStatus(status)}`}
                               data-cell={`${e.id}|${p.playerId}`}
                               title={`${p.firstName} — ${formatEventDate(e.startsAt)}: tap to change`}
-                              className={`block w-full cursor-pointer px-1.5 py-1 text-xs font-bold hover:opacity-80 ${face.cls}`}
+                              className={`block min-h-8 w-full min-w-8 cursor-pointer px-1.5 py-2 text-xs font-bold hover:opacity-80 ${face.cls}`}
                             >
                               {face.label}
                             </button>
                           ) : (
-                            <span className={`block px-1.5 py-1 text-xs font-bold ${face.cls}`}>
+                            <span className={`block min-h-8 px-1.5 py-2 text-xs font-bold ${face.cls}`}>
                               {face.label}
                             </span>
                           )}
