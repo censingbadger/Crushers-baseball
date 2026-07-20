@@ -99,6 +99,42 @@ export function gapFillOptions(
     .slice(0, 3);
 }
 
+export interface DepthEntry {
+  playerId: string;
+  rating: number;
+  /** Where they are right now: this slot, another slot, or BENCH. */
+  where: string;
+  holder: boolean;
+  /** The player's own aspirations list this position. */
+  aspiring: boolean;
+}
+
+/**
+ * The depth chart for one position: the current holder pinned first, then
+ * everyone else ranked by their rating there (a small nudge for kids who
+ * asked for the spot — coaches weigh that too).
+ */
+export function positionDepth(
+  slot: string,
+  current: Assignments,
+  ratings: Ratings,
+  aspiringByPlayer: Record<string, string[]> = {},
+  count = 4,
+): DepthEntry[] {
+  const entries: DepthEntry[] = Object.entries(current).map(([pid, where]) => ({
+    playerId: pid,
+    rating: ratingOf(ratings, pid, slot),
+    where,
+    holder: where === slot,
+    aspiring: (aspiringByPlayer[pid] ?? []).includes(slot),
+  }));
+  const score = (e: DepthEntry) =>
+    (e.holder ? 1000 : 0) + e.rating + (e.aspiring ? 0.25 : 0);
+  return entries
+    .sort((a, b) => score(b) - score(a))
+    .slice(0, count + 1); // holder + the next `count`
+}
+
 export interface AuditSuggestion {
   kind: "gap" | "upgrade" | "swap" | "rest";
   slot?: string;

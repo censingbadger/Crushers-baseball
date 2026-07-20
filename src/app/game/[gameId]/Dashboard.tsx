@@ -13,7 +13,7 @@ import {
   swapBattingSpot,
 } from "@/app/game/actions";
 import { BENCH } from "@/lib/gameday";
-import { auditLineup, gapFillOptions, type Move } from "@/lib/recommend";
+import { auditLineup, gapFillOptions, positionDepth, type Move } from "@/lib/recommend";
 
 const POSITIONS = ["P", "C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"] as const;
 
@@ -120,6 +120,8 @@ interface Props {
   gamePitchesByPlayer: Record<string, number>;
   eligibility: Record<string, { eligible: boolean; remaining: number; reason: string | null }>;
   ratingsByPlayer: Record<string, Record<string, number>>;
+  /** playerId -> positions the kid's aspirations name (e.g. ["SS","P"]). */
+  aspiringByPlayer: Record<string, string[]>;
   score: { inning: number; side: "us" | "them"; runs: number }[];
   battingOrder: { playerId: string; spot: number }[];
 }
@@ -159,6 +161,8 @@ export function Dashboard(props: Props) {
   const [busy, setBusy] = useState(false);
   // The slot a move just vacated — the assist island leads with it.
   const [focusGap, setFocusGap] = useState<string | null>(null);
+  // The slot a move just filled — the island shows its depth chart.
+  const [focusSlot, setFocusSlot] = useState<string | null>(null);
   // Drag state: press a chip (long-press on touch, click-hold on mouse),
   // pull it over a slot or the bench, release to drop.
   const [drag, setDrag] = useState<{ pid: string; x: number; y: number; armed: boolean } | null>(null);
@@ -213,6 +217,7 @@ export function Dashboard(props: Props) {
     setWarning(null);
     setSelected(null);
     setFocusGap(from !== BENCH && from !== target && !occupant ? from : null);
+    setFocusSlot(target !== BENCH && target !== from ? target : null);
     startTransition(() => router.refresh());
   }
 
@@ -332,6 +337,22 @@ export function Dashboard(props: Props) {
 
   const ratingChip = (pid: string, slot: string) =>
     props.ratingsByPlayer[pid]?.[slot] ?? 1;
+
+  // Depth chart the island leads with: the slot of the selected fielder,
+  // or the one a move just filled.
+  const depthSlot =
+    (selected && current[selected] !== BENCH ? current[selected] : null) ?? focusSlot;
+  const depth = useMemo(
+    () =>
+      depthSlot
+        ? positionDepth(depthSlot, current, props.ratingsByPlayer, props.aspiringByPlayer)
+        : [],
+    [depthSlot, current, props.ratingsByPlayer, props.aspiringByPlayer],
+  );
+
+  // Gray ghost on an empty slot: the best one-move (bench) fill.
+  const ghostFor = (slot: string) =>
+    gapOptions.get(slot)?.find((o) => o.kind === "bench") ?? null;
 
   const scoreFor = (inning: number, side: "us" | "them") =>
     props.score.find((s) => s.inning === inning && s.side === side)?.runs;
@@ -453,10 +474,19 @@ export function Dashboard(props: Props) {
                     hovered ? "scale-110 ring-4 ring-team-orange" : ""
                   } ${dragged ? "opacity-40" : ""}`}
                 >
-                  <span className="block text-[11px] font-bold uppercase opacity-70">{pos}</span>
+                  <span className="block text-[11px] font-bold uppercase opacity-70">
+                    {pos}
+                    {/* While dragging: the dragged player's fit, everywhere. */}
+                    {drag?.armed && ` · ${ratingChip(drag.pid, pos)}`}
+                  </span>
                   <span className="block text-sm font-extrabold leading-tight">
                     {pid ? nameOf(pid) : "—"}
                   </span>
+                  {!pid && !drag?.armed && ghostFor(pos) && (
+                    <span className="block text-[11px] font-semibold italic leading-tight opacity-80">
+                      {nameOf(ghostFor(pos)!.primaryId)}?
+                    </span>
+                  )}
                   {pos === "P" && pid && (
                     <span className="block text-[11px] font-semibold">
                       {props.gamePitchesByPlayer[pid] ?? 0} p · {eligibility[pid]?.remaining ?? 0} left
@@ -554,6 +584,30 @@ export function Dashboard(props: Props) {
           {/* The configurator island: gap fills first, then tune-ups. */}
           <div className="rounded-lg border border-line bg-paper p-2" data-testid="assist">
             <span className="text-xs font-bold uppercase">Coach&apos;s assist</span>
+            {depthSlot && depth.length > 0 && (
+              <div className="mt-1 rounded bg-team-blue-light/60 p-1.5 text-xs">
+                <p className="font-bold">{depthSlot} depth</p>
+                {depth.map((d) => (
+                  <p
+                    key={d.playerId}
+                    className={`mt-0.5 font-semibold ${d.holder ? "" : "text-neutral-700"}`}
+                  >
+                    {d.holder ? "✓ " : ""}
+                    {nameOf(d.playerId)} {d.rating}
+                    {!d.holder && (
+                      <span className="text-neutral-500">
+                        {" "}· {d.where === BENCH ? "bench" : d.where}
+                      </span>
+                    )}
+                    {d.aspiring && (
+                      <span className="ml-1 rounded bg-amber-300 px-1 text-[10px] font-bold">
+                        ★ wants it
+                      </span>
+                    )}
+                  </p>
+                ))}
+              </div>
+            )}
             {orderedGaps.map((slot) => (
               <p
                 key={slot}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditLineup, gapFillOptions } from "./recommend";
+import { auditLineup, gapFillOptions, positionDepth } from "./recommend";
 import { BENCH } from "./gameday";
 
 // A tiny world: a1..a9 fielded, b1/b2 on the bench.
@@ -42,6 +42,25 @@ describe("gapFillOptions", () => {
     const current = { ...FIELD, a8: BENCH };
     const [best] = gapFillOptions("CF", current, {});
     expect(best.minRating).toBe(1);
+  });
+});
+
+describe("positionDepth", () => {
+  it("pins the holder first, then ranks everyone by rating there", () => {
+    const ratings = { a2: { C: 5 }, b1: { C: 8 }, a3: { C: 7 } };
+    const depth = positionDepth("C", FIELD, ratings);
+    expect(depth[0]).toMatchObject({ playerId: "a2", holder: true });
+    expect(depth[1]).toMatchObject({ playerId: "b1", where: BENCH, rating: 8 });
+    expect(depth[2]).toMatchObject({ playerId: "a3", where: "1B", rating: 7 });
+  });
+
+  it("flags and slightly favors aspiring players at equal rating", () => {
+    const ratings = { b1: { C: 6 }, b2: { C: 6 } };
+    const depth = positionDepth("C", FIELD, ratings, { b2: ["C", "SS"] });
+    const b2 = depth.find((d) => d.playerId === "b2");
+    const b1 = depth.find((d) => d.playerId === "b1");
+    expect(b2?.aspiring).toBe(true);
+    expect(depth.indexOf(b2!)).toBeLessThan(depth.indexOf(b1!));
   });
 });
 
