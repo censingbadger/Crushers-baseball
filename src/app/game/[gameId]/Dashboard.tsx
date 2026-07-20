@@ -9,6 +9,7 @@ import {
   autoArrangeField,
   moveGamePlayer,
   setInning,
+  setUpSpot,
   swapBattingSpot,
 } from "@/app/game/actions";
 import { BENCH } from "@/lib/gameday";
@@ -111,6 +112,7 @@ interface Props {
     startedAtMs: number | null;
     currentInning: number;
     outs: number;
+    upSpot: number;
   };
   players: Player[];
   /** playerId -> slot for the current inning */
@@ -143,6 +145,10 @@ export function Dashboard(props: Props) {
   // Game context: "compete" ranks by role & ability for a close game;
   // "develop" hands the develop spots and the kids' ★ picks the reps.
   const [mode, setMode] = useState<LineupMode>("compete");
+  // The board's "who's up" pointer — optimistic locally, server-synced so
+  // every device in the dugout shows the same batter.
+  const [upSpot, setUpSpotLocal] = useState(game.upSpot);
+  useEffect(() => setUpSpotLocal(game.upSpot), [game.upSpot]);
   // The slot a move just vacated — the assist island leads with it.
   const [focusGap, setFocusGap] = useState<string | null>(null);
   // The slot a move just filled — the island shows its depth chart.
@@ -459,10 +465,22 @@ export function Dashboard(props: Props) {
         </div>
       )}
 
-      <div className={board ? "grid gap-3" : "grid gap-3 lg:grid-cols-[1fr_260px]"}>
+      <div
+        className={
+          board
+            ? "grid gap-3 lg:grid-cols-[3fr_2fr] lg:items-start"
+            : "grid gap-3 lg:grid-cols-[1fr_260px]"
+        }
+      >
         {/* Field */}
         <div>
-          <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-line">
+          {/* Board mode caps the diamond by viewport height so field +
+              batting order share one iPad-landscape screen, no scrolling. */}
+          <div
+            className={`relative aspect-[4/3] overflow-hidden rounded-xl border border-line ${
+              board ? "mx-auto lg:max-w-[calc((100vh-240px)*1.3333)]" : ""
+            }`}
+          >
             <FieldArt />
             {POSITIONS.map((pos) => {
               const pid = playerAt.get(pos) ?? null;
@@ -713,24 +731,45 @@ export function Dashboard(props: Props) {
           </div>
           )}
           <div className="rounded-lg border border-line bg-paper p-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-bold uppercase">Batting order</span>
-              {!board && (
-                <button
-                  className="btn px-2 py-0.5 text-xs"
-                  disabled={pending || busy}
-                  onClick={() => {
-                    if (!window.confirm("Replace the current batting order with a generated one? You can still fine-tune with the arrows.")) return;
-                    startTransition(async () => {
-                      const res = await applySuggestedBattingOrder(game.id);
-                      setOrderNotes(res.notes);
-                      router.refresh();
-                    });
-                  }}
-                >
-                  ✨ Suggest order
-                </button>
-              )}
+              <span className="flex items-center gap-1.5">
+                {props.battingOrder.length > 0 && (
+                  <button
+                    className={`btn ${board ? "px-3 py-1.5 text-sm" : "px-2 py-0.5 text-xs"}`}
+                    disabled={pending}
+                    data-testid="next-batter"
+                    onClick={() => {
+                      const list = props.battingOrder;
+                      const idx = list.findIndex((o) => o.spot === upSpot);
+                      const next = list[(idx + 1 + list.length) % list.length];
+                      setUpSpotLocal(next.spot);
+                      startTransition(async () => {
+                        await setUpSpot(game.id, next.spot);
+                        router.refresh();
+                      });
+                    }}
+                  >
+                    Next batter →
+                  </button>
+                )}
+                {!board && (
+                  <button
+                    className="btn px-2 py-0.5 text-xs"
+                    disabled={pending || busy}
+                    onClick={() => {
+                      if (!window.confirm("Replace the current batting order with a generated one? You can still fine-tune with the arrows.")) return;
+                      startTransition(async () => {
+                        const res = await applySuggestedBattingOrder(game.id);
+                        setOrderNotes(res.notes);
+                        router.refresh();
+                      });
+                    }}
+                  >
+                    ✨ Suggest order
+                  </button>
+                )}
+              </span>
             </div>
             {!board && orderNotes && (
               <div className="mt-1 rounded bg-team-blue-light/60 p-1.5 text-[11px] font-semibold text-neutral-700">
@@ -740,30 +779,81 @@ export function Dashboard(props: Props) {
                 {orderNotes.length > 5 && <p>… rest by overall quality.</p>}
               </div>
             )}
-            <ol className="mt-1 space-y-0.5 text-sm">
-              {props.battingOrder.map((o, i) => (
-                <li key={o.playerId} className="flex items-center gap-1">
-                  <span className="w-5 text-right font-mono text-xs">{i + 1}.</span>
-                  <span className="flex-1 font-semibold">{nameOf(o.playerId)}</span>
-                  <span className="text-[11px] text-neutral-500">
-                    {current[o.playerId] === BENCH ? "bench" : current[o.playerId]}
-                  </span>
-                  <button
-                    className="rounded-lg border border-line-strong px-2.5 py-1.5 text-sm leading-none"
-                    onClick={() => startTransition(async () => { await swapBattingSpot(game.id, o.playerId, "up"); router.refresh(); })}
-                    disabled={i === 0}
+            <ol className={`mt-1 ${board ? "space-y-1" : "space-y-0.5"} text-sm`}>
+              {props.battingOrder.map((o, i) => {
+                const n = props.battingOrder.length;
+                const upIdx = Math.max(
+                  0,
+                  props.battingOrder.findIndex((x) => x.spot === upSpot),
+                );
+                const isUp = i === upIdx;
+                const onDeck = n > 1 && i === (upIdx + 1) % n;
+                const inHole = n > 2 && i === (upIdx + 2) % n;
+                return (
+                  <li
+                    key={o.playerId}
+                    className={`flex items-center gap-1 rounded px-1 ${
+                      isUp ? "bg-team-orange/20 ring-1 ring-team-orange" : ""
+                    } ${board ? "py-1" : ""}`}
                   >
-                    ↑
-                  </button>
-                  <button
-                    className="rounded-lg border border-line-strong px-2.5 py-1.5 text-sm leading-none"
-                    onClick={() => startTransition(async () => { await swapBattingSpot(game.id, o.playerId, "down"); router.refresh(); })}
-                    disabled={i === props.battingOrder.length - 1}
-                  >
-                    ↓
-                  </button>
-                </li>
-              ))}
+                    {/* Tap the batter to mark him up — the dugout's one job. */}
+                    <button
+                      className="flex min-w-0 flex-1 items-center gap-1 text-left"
+                      data-spot={o.spot}
+                      onClick={() => {
+                        setUpSpotLocal(o.spot);
+                        startTransition(async () => {
+                          await setUpSpot(game.id, o.spot);
+                          router.refresh();
+                        });
+                      }}
+                    >
+                      <span className={`w-5 shrink-0 text-right font-mono ${board ? "text-sm" : "text-xs"}`}>
+                        {i + 1}.
+                      </span>
+                      <span className={`truncate font-semibold ${board ? "text-lg" : ""}`}>
+                        {nameOf(o.playerId)}
+                      </span>
+                      {isUp && (
+                        <span className="shrink-0 rounded border border-team-orange-dark bg-team-orange px-1.5 py-0.5 text-[11px] font-extrabold uppercase text-paper">
+                          Up
+                        </span>
+                      )}
+                      {onDeck && (
+                        <span className="shrink-0 rounded border border-line bg-team-blue-light px-1.5 py-0.5 text-[10px] font-bold uppercase">
+                          on deck
+                        </span>
+                      )}
+                      {inHole && (
+                        <span className="shrink-0 rounded border border-line bg-paper px-1.5 py-0.5 text-[10px] font-bold uppercase text-neutral-500">
+                          in the hole
+                        </span>
+                      )}
+                    </button>
+                    <span className={`shrink-0 text-neutral-500 ${board ? "text-sm" : "text-[11px]"}`}>
+                      {current[o.playerId] === BENCH ? "bench" : current[o.playerId]}
+                    </span>
+                    {!board && (
+                      <>
+                        <button
+                          className="rounded-lg border border-line-strong px-2.5 py-1.5 text-sm leading-none"
+                          onClick={() => startTransition(async () => { await swapBattingSpot(game.id, o.playerId, "up"); router.refresh(); })}
+                          disabled={i === 0}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          className="rounded-lg border border-line-strong px-2.5 py-1.5 text-sm leading-none"
+                          onClick={() => startTransition(async () => { await swapBattingSpot(game.id, o.playerId, "down"); router.refresh(); })}
+                          disabled={i === props.battingOrder.length - 1}
+                        >
+                          ↓
+                        </button>
+                      </>
+                    )}
+                  </li>
+                );
+              })}
             </ol>
           </div>
           {!board && (

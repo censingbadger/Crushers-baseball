@@ -98,6 +98,7 @@ export default async function GamePage({
           startedAtMs: game.startedAt ? game.startedAt.getTime() : null,
           currentInning: game.currentInning,
           outs: game.outs,
+          upSpot: game.upSpot,
         }}
         players={players}
         current={current}

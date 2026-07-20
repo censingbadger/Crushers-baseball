@@ -1,0 +1,1 @@
+ALTER TABLE "live_games" ADD COLUMN "up_spot" integer DEFAULT 1 NOT NULL;

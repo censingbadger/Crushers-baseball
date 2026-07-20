@@ -240,6 +240,18 @@ export async function setInning(gameId: string, inning: number): Promise<void> {
   revalidatePath(`/game/${gameId}`);
 }
 
+/** The dugout board's "who's up" marker — tap a batter, everyone syncs. */
+export async function setUpSpot(gameId: string, spot: number): Promise<void> {
+  await requireCoach();
+  if (!Number.isInteger(spot) || spot < 1 || spot > 30) return;
+  const db = await getDb();
+  await db
+    .update(tables.liveGames)
+    .set({ upSpot: spot })
+    .where(eq(tables.liveGames.id, gameId));
+  revalidatePath(`/game/${gameId}`);
+}
+
 export async function cycleOuts(gameId: string): Promise<void> {
   await requireCoach();
   const game = await loadGame(gameId);

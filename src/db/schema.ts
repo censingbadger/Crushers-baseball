@@ -367,6 +367,9 @@ export const weekendPlanLines = pgTable(
 // contains several games).
 export type GameStatus = "setup" | "live" | "final";
 
+// upSpot: the batting-order spot currently at the plate — the dugout
+// board's "who's up" marker, advanced by tap as the game moves. Lineup
+// running, not scorekeeping.
 export const liveGames = pgTable("live_games", {
   id: uuid("id").primaryKey().defaultRandom(),
   seasonId: uuid("season_id")
@@ -383,6 +386,7 @@ export const liveGames = pgTable("live_games", {
   startedAt: timestamp("started_at"),
   currentInning: integer("current_inning").notNull().default(1),
   outs: integer("outs").notNull().default(0),
+  upSpot: integer("up_spot").notNull().default(1),
   gameDate: date("game_date").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
