@@ -1,4 +1,7 @@
 import { notFound } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { getDb, tables } from "@/db";
+import { POSITIONS } from "@/db/schema";
 import { requireCoach } from "@/lib/auth";
 import { benchInnings } from "@/lib/gameday";
 import { gameSnapshot } from "@/app/game/actions";
@@ -38,6 +41,27 @@ export default async function GamePage({
     }
   }
 
+  // Positions each kid says they want (free text like "SS, P" → tokens) —
+  // the depth chart stars them so playing-time promises stay visible.
+  const db = await getDb();
+  const aspRows = await db
+    .select({
+      playerId: tables.aspirations.playerId,
+      desiredPositions: tables.aspirations.desiredPositions,
+    })
+    .from(tables.aspirations)
+    .where(eq(tables.aspirations.seasonId, game.seasonId));
+  const aspiringByPlayer: Record<string, string[]> = {};
+  for (const row of aspRows) {
+    const tokens = (row.desiredPositions ?? "")
+      .toUpperCase()
+      .split(/[^A-Z0-9]+/)
+      .filter((t): t is (typeof POSITIONS)[number] =>
+        (POSITIONS as readonly string[]).includes(t),
+      );
+    if (tokens.length > 0) aspiringByPlayer[row.playerId] = tokens;
+  }
+
   return (
     <div>
       <h1 className="mb-2 text-xl font-extrabold">
@@ -64,6 +88,7 @@ export default async function GamePage({
         gamePitchesByPlayer={gamePitchesByPlayer}
         eligibility={snap.eligibility}
         ratingsByPlayer={snap.ratingsByPlayer}
+        aspiringByPlayer={aspiringByPlayer}
         score={scoreRows.map((s) => ({ inning: s.inning, side: s.side, runs: s.runs }))}
         battingOrder={orderRows.map((o) => ({ playerId: o.playerId, spot: o.spot }))}
       />

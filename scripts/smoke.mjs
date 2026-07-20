@@ -191,6 +191,10 @@ if (!liveText?.includes("1–0") && !liveText?.includes("1–0".normalize())) {
 // Move the pitcher to the bench (tap pitcher, tap bench button).
 const pitcherBtn = page.locator("button:has(span:text-is('P'))").first();
 await pitcherBtn.click();
+// Selecting a fielder shows that position's depth chart in the island.
+await page.waitForTimeout(300);
+const depthText = await page.textContent("main");
+if (!depthText?.includes("P depth")) fail("depth chart missing for selected P");
 await page.click("button:has-text('send')");
 await page.waitForTimeout(800);
 const afterMove = await page.textContent("main");
