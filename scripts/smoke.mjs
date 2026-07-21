@@ -240,7 +240,7 @@ await page.waitForTimeout(700);
 // seed rates Eli below standard on Fielding (D3) and Focus (D8).
 await page.goto(BASE + "/homework");
 const hwText = await page.textContent("main");
-if (!hwText?.includes("between-practice work")) fail("homework page incomplete");
+if (!hwText?.includes("at-home drills")) fail("homework page incomplete");
 const eliCard = page.locator("[data-hw-player='Eli Brooks']");
 const eliChips = await eliCard.locator("summary").first().textContent();
 if (!eliChips?.includes("Focus")) fail("Eli's Focus (D8) gap chip missing");
@@ -271,18 +271,41 @@ await page
 await page.waitForTimeout(900);
 const afterDone = await page.locator("[data-hw-player='Eli Brooks']").textContent();
 if (!afterDone?.includes("Reopen")) fail("homework done-toggle did not stick");
+// An assigned drill is click-to-read — you shouldn't need to know it by name.
+const assignedRow = eliCard.locator("[data-assigned]").first();
+await assignedRow.locator("summary:has-text('What is this drill')").click();
+await page.waitForTimeout(200);
+if (!(await assignedRow.textContent())?.includes("The one thought"))
+  fail("assigned drill won't expand to its details");
 
 // Team focus: two seeded kids sit below standard on Throwing (D2), so
-// the shared-gap panel offers a one-tap team theme.
+// the shared-gap panel offers a one-tap team theme — each drill opens to
+// its details before you send it to everyone.
 const hwFull = await page.textContent("main");
 if (!hwFull?.includes("Team focus")) fail("team focus panel missing");
 if (!hwFull?.includes("below the 11U standard")) fail("team focus missing the head count");
+const focusDrill = page.locator("[data-testid=team-focus] [data-drill]").first();
+await focusDrill.locator("summary").click();
+await page.waitForTimeout(200);
+if (!(await focusDrill.textContent())?.includes("Assign to whole team"))
+  fail("team-focus drill won't expand to details + assign");
 
-// Catalog search: skill/gap/goal words find sourced drills.
+// Catalog search: skill/gap/goal words find sourced drills, and each hit
+// opens to its full instructions.
 await page.fill("#hw-q", "wall ball");
 await page.waitForTimeout(400);
 const searchText = await page.textContent("[data-testid=hw-search]");
 if (!searchText?.includes("Wall ball")) fail("catalog search found nothing for wall ball");
+const searchHit = page.locator("[data-search-drill='Wall ball']");
+await searchHit.locator("summary").click();
+await page.waitForTimeout(200);
+if (!(await searchHit.textContent())?.includes("The one thought"))
+  fail("search hit won't expand to its details");
+// Blank box browses the whole catalog.
+await page.fill("#hw-q", "");
+await page.waitForTimeout(300);
+const browseCount = await page.locator("[data-testid=hw-search] [data-search-drill]").count();
+if (browseCount < 20) fail(`blank search should browse all drills (saw ${browseCount})`);
 
 // ⚡ Auto-assign team: every rated kid gets his top gap's drill in one tap.
 await page.click("button:has-text('Auto-assign team')");
