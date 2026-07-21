@@ -12,7 +12,7 @@ import {
   teamGaps,
   type HomeworkDrill,
 } from "@/lib/homework";
-import { DrillDiagram } from "@/components/DrillDiagram";
+import { DrillDetail } from "@/components/DrillDetail";
 import { formatEventDate } from "@/lib/format";
 import { HomeworkSearch } from "./Search";
 import {
@@ -30,6 +30,9 @@ import {
 // coachability) — into researched, sourced drills a family can run at
 // home, and tracks what's been assigned. Roster order, no ranking.
 
+// A drill as a click-to-open card: the name is the summary, the details
+// (what it fixes, the cue, steps, gear, safety, diagram, source) open
+// below, with an Assign button.
 function DrillCard({
   drill,
   seasonId,
@@ -48,31 +51,7 @@ function DrillCard({
           {drill.minutes} min · {drill.partner ? "needs a partner" : "solo"}
         </span>
       </summary>
-      <div className="mt-2 space-y-2 text-sm">
-        <p className="font-semibold text-neutral-700">{drill.fixes}</p>
-        <p className="rounded bg-team-blue-light/60 px-2 py-1.5 font-bold">
-          🗣 The one thought: “{drill.cue}”
-        </p>
-        <ol className="list-decimal space-y-1 pl-5">
-          {drill.steps.map((s) => (
-            <li key={s}>{s}</li>
-          ))}
-        </ol>
-        <p className="text-xs font-semibold text-neutral-600">
-          <b>How much:</b> {drill.reps} · <b>Gear:</b> {drill.equipment}
-        </p>
-        {drill.safety && (
-          <p className="rounded border border-amber-600 bg-amber-50 px-2 py-1.5 text-xs font-semibold">
-            ⚠ {drill.safety}
-          </p>
-        )}
-        {drill.diagram && <DrillDiagram kind={drill.diagram} />}
-        <p className="text-xs text-neutral-500">
-          Source:{" "}
-          <a className="underline" href={drill.source.url} target="_blank" rel="noreferrer">
-            {drill.source.name}
-          </a>
-        </p>
+      <DrillDetail drill={drill}>
         <form action={assignHomework}>
           <input type="hidden" name="seasonId" value={seasonId} />
           <input type="hidden" name="playerId" value={playerId} />
@@ -81,7 +60,7 @@ function DrillCard({
             ＋ Assign as homework
           </button>
         </form>
-      </div>
+      </DrillDetail>
     </details>
   );
 }
@@ -140,16 +119,8 @@ export default async function HomeworkPage() {
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-extrabold">Homework</h1>
-          <p className="mt-1 max-w-3xl text-sm text-neutral-700">
-            Player feedback turned into between-practice work. Each kid&apos;s
-            lowest observed levels — skills and the self-regulation dimensions
-            alike — come with researched drills a family can run at home, most
-            with nothing more than a glove, a ball, and a wall. Assign what
-            fits, check it off at the next practice. Feedback lives in{" "}
-            <Link className="underline" href="/rate">
-              Player feedback
-            </Link>
-            ; an unrated player has no gaps to work from yet.
+          <p className="mt-1 text-sm text-neutral-700">
+            Feedback gaps → at-home drills.
           </p>
         </div>
         <span className="flex items-center gap-2">
@@ -176,27 +147,48 @@ export default async function HomeworkPage() {
           <h2 className="text-xs font-bold uppercase text-neutral-600">
             Team focus — shared gaps
           </h2>
+          <p className="mt-0.5 text-xs text-neutral-500">
+            Open a drill to read it, then send it to everyone it fits.
+          </p>
           <div className="mt-1.5 space-y-2">
             {focus.map((f) => (
-              <div key={f.dimension} className="flex flex-wrap items-center gap-1.5">
-                <span className="font-bold">{BARS_BY_KEY[f.dimension].label}</span>
-                <span className="text-xs font-semibold text-neutral-600">
-                  {f.below} of {f.rated} rated players below the 11U standard
-                </span>
-                {drillsFor(f.dimension, HOMEWORK_CATALOG, 2).map((d) => (
-                  <form key={d.key} action={assignDrillToTeam}>
-                    <input type="hidden" name="seasonId" value={season.id} />
-                    <input type="hidden" name="drillKey" value={d.key} />
-                    <button
-                      className="btn px-2 py-1 text-xs"
-                      type="submit"
-                      title={`${d.fixes} (${d.minutes} min · ${d.partner ? "partner" : "solo"})`}
+              <div key={f.dimension}>
+                <p className="text-sm">
+                  <span className="font-bold">{BARS_BY_KEY[f.dimension].label}</span>
+                  <span className="ml-1.5 text-xs font-semibold text-neutral-600">
+                    {f.below} of {f.rated} rated players below the 11U standard
+                  </span>
+                </p>
+                <div className="mt-1 space-y-1">
+                  {drillsFor(f.dimension, HOMEWORK_CATALOG, 2).map((d) => (
+                    <details
+                      key={d.key}
+                      className="rounded-lg border border-line bg-paper p-2"
+                      data-drill={d.key}
                     >
-                      {d.staple ? "★ " : ""}
-                      {d.title} → team
-                    </button>
-                  </form>
-                ))}
+                      <summary className="cursor-pointer text-sm font-bold">
+                        {d.staple ? "★ " : ""}
+                        {d.title}
+                        <span className="ml-1.5 text-xs font-semibold text-neutral-500">
+                          {d.minutes} min · {d.partner ? "needs a partner" : "solo"}
+                        </span>
+                      </summary>
+                      <DrillDetail drill={d}>
+                        <form action={assignDrillToTeam}>
+                          <input type="hidden" name="seasonId" value={season.id} />
+                          <input type="hidden" name="drillKey" value={d.key} />
+                          <button
+                            className="btn btn-primary px-3 py-1.5 text-xs"
+                            type="submit"
+                            title="Everyone it fits — role drills reach only role players"
+                          >
+                            ＋ Assign to whole team
+                          </button>
+                        </form>
+                      </DrillDetail>
+                    </details>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -322,28 +314,11 @@ export default async function HomeworkPage() {
                 </p>
               )}
 
-              <details className="rounded-lg border border-dashed border-line-strong p-2">
-                <summary className="cursor-pointer text-xs font-bold uppercase text-neutral-600">
-                  Assign from the full drill list
-                </summary>
-                <form action={assignHomework} className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  <input type="hidden" name="seasonId" value={season.id} />
-                  <input type="hidden" name="playerId" value={p.playerId} />
-                  <select
-                    name="drillKey"
-                    className="min-w-0 flex-1 rounded border border-line px-2 py-1.5 text-sm"
-                  >
-                    {HOMEWORK_CATALOG.map((d) => (
-                      <option key={d.key} value={d.key}>
-                        {BARS_BY_KEY[d.dimension].label} — {d.title}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="btn px-3 py-1.5 text-xs" type="submit">
-                    Assign
-                  </button>
-                </form>
-              </details>
+              <p className="text-xs text-neutral-500">
+                Assigning something specific? Use <b>Find a drill</b> at the top
+                — search or leave it blank to browse all {HOMEWORK_CATALOG.length},
+                open any to read it, then assign to {name.split(" ")[0]} or the team.
+              </p>
 
               {mine.length > 0 && (
                 <div>
@@ -356,47 +331,58 @@ export default async function HomeworkPage() {
                       return (
                         <li
                           key={a.id}
-                          className="flex flex-wrap items-center gap-1.5 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm"
+                          className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm"
+                          data-assigned={drill?.title ?? a.drillKey}
                         >
-                          <span
-                            className={`font-bold ${
-                              a.status === "done" ? "text-neutral-400 line-through" : ""
-                            }`}
-                          >
-                            {drill?.title ?? a.drillKey}
-                          </span>
-                          <span className="chip bg-team-blue-light">
-                            {BARS_BY_KEY[a.dimension as BarsKey]?.label ?? a.dimension}
-                          </span>
-                          <span className="text-xs font-semibold text-neutral-500">
-                            {a.assignedBy} · {formatEventDate(a.createdAt)}
-                          </span>
-                          {a.note && (
-                            <span className="text-xs text-neutral-600">“{a.note}”</span>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={`font-bold ${
+                                a.status === "done" ? "text-neutral-400 line-through" : ""
+                              }`}
+                            >
+                              {drill?.title ?? a.drillKey}
+                            </span>
+                            <span className="chip bg-team-blue-light">
+                              {BARS_BY_KEY[a.dimension as BarsKey]?.label ?? a.dimension}
+                            </span>
+                            <span className="text-xs font-semibold text-neutral-500">
+                              {a.assignedBy} · {formatEventDate(a.createdAt)}
+                            </span>
+                            {a.note && (
+                              <span className="text-xs text-neutral-600">“{a.note}”</span>
+                            )}
+                            <span className="ml-auto flex items-center gap-1">
+                              <form action={toggleHomework}>
+                                <input type="hidden" name="id" value={a.id} />
+                                <button
+                                  className={`btn px-2 py-1 text-xs ${
+                                    a.status === "done" ? "" : "btn-primary"
+                                  }`}
+                                  type="submit"
+                                >
+                                  {a.status === "done" ? "↺ Reopen" : "✓ Done"}
+                                </button>
+                              </form>
+                              <form action={removeHomework}>
+                                <input type="hidden" name="id" value={a.id} />
+                                <button
+                                  className="btn px-2 py-1 text-xs"
+                                  type="submit"
+                                  title="Remove"
+                                >
+                                  ✕
+                                </button>
+                              </form>
+                            </span>
+                          </div>
+                          {drill && (
+                            <details className="mt-1">
+                              <summary className="cursor-pointer text-xs font-semibold text-team-blue-dark underline">
+                                What is this drill?
+                              </summary>
+                              <DrillDetail drill={drill} />
+                            </details>
                           )}
-                          <span className="ml-auto flex items-center gap-1">
-                            <form action={toggleHomework}>
-                              <input type="hidden" name="id" value={a.id} />
-                              <button
-                                className={`btn px-2 py-1 text-xs ${
-                                  a.status === "done" ? "" : "btn-primary"
-                                }`}
-                                type="submit"
-                              >
-                                {a.status === "done" ? "↺ Reopen" : "✓ Done"}
-                              </button>
-                            </form>
-                            <form action={removeHomework}>
-                              <input type="hidden" name="id" value={a.id} />
-                              <button
-                                className="btn px-2 py-1 text-xs"
-                                type="submit"
-                                title="Remove"
-                              >
-                                ✕
-                              </button>
-                            </form>
-                          </span>
                         </li>
                       );
                     })}
