@@ -106,7 +106,7 @@ export default async function HomeworkPage() {
       positionsByPlayer.set(r.playerId, list);
     }
   }
-  const focus = teamGaps(summary);
+  const focus = teamGaps(summary, roleFlags);
   const byPlayer = new Map<string, typeof assignments>();
   for (const a of assignments) {
     const list = byPlayer.get(a.playerId) ?? [];

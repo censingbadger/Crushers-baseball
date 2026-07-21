@@ -194,14 +194,24 @@ export interface TeamGap {
  * sit below the 11U standard. Sorted by head count (then share), only
  * dimensions where at least two kids are below — one kid is his own
  * homework, not a team theme. Counts only; no player list, no ranking.
+ *
+ * The pitching/catching role modules only count kids who actually fill
+ * the role (matching per-player gaps and who the team-assign would reach)
+ * — pass `roleByPlayer` to gate them; without it, every dimension counts.
  */
 export function teamGaps(
   summaries: ReadonlyMap<string, ReadonlyMap<BarsKey, BarsCell>>,
+  roleByPlayer?: ReadonlyMap<string, { pitcher: boolean; catcher: boolean }>,
   limit = 3,
 ): TeamGap[] {
   const tally = new Map<BarsKey, { below: number; rated: number }>();
-  for (const cells of summaries.values()) {
+  for (const [playerId, cells] of summaries) {
+    const roles = roleByPlayer?.get(playerId);
     for (const [dim, cell] of cells) {
+      if (roleByPlayer) {
+        if (dim === "pitching" && !roles?.pitcher) continue;
+        if (dim === "catching" && !roles?.catcher) continue;
+      }
       const t = tally.get(dim) ?? { below: 0, rated: 0 };
       t.rated += 1;
       if (cell.median < 3) t.below += 1;

@@ -74,7 +74,7 @@ function DrillResult({
             {drill.minutes} min · {drill.partner ? "partner" : "solo"}
           </span>
         </summary>
-        <DrillDetail drill={drill}>
+        <DrillDetail drill={drill} compact>
           <div className="flex flex-wrap items-center gap-1.5">
             <form action={assignHomework} className="flex items-center gap-1">
               <input type="hidden" name="seasonId" value={seasonId} />

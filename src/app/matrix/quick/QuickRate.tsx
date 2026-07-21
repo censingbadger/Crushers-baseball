@@ -78,7 +78,10 @@ export function QuickRate({
                 <span className="ml-0.5 align-middle text-[10px] text-green-700">✓</span>
               )}
             </span>
-            <div className="grid flex-1 grid-cols-10 gap-1">
+            {/* Two rows of five on phones so a one-handed tap on the 1–10
+                scale isn't a coin-flip between adjacent scores (each button
+                would be ~23px across ten columns); full ten-across from sm. */}
+            <div className="grid flex-1 grid-cols-5 gap-1 sm:grid-cols-10">
               {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
                 const active = mine[pos] === n;
                 return (
@@ -87,7 +90,7 @@ export function QuickRate({
                     data-pos={pos}
                     data-val={n}
                     onClick={() => tap(pos, n)}
-                    className={`rounded border py-1.5 text-center text-sm font-bold transition ${
+                    className={`min-h-[44px] rounded border py-2.5 text-center text-sm font-bold transition ${
                       active
                         ? "border-team-orange-dark bg-team-orange text-paper"
                         : "border-line bg-paper hover:bg-team-blue-light"

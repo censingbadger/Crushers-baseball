@@ -1,0 +1,2 @@
+CREATE INDEX "pitch_counts_player" ON "pitch_counts" USING btree ("player_id");--> statement-breakpoint
+CREATE INDEX "position_ratings_season_created" ON "position_ratings" USING btree ("season_id","created_at");

@@ -193,20 +193,27 @@ export const signups = pgTable("signups", {
 // current matrix is the latest row per (season, player, position, rater),
 // and older rows are the history. `rater` is a coach label (e.g. "MC"),
 // mirroring the per-coach sheets of the original Excel workbook.
-export const positionRatings = pgTable("position_ratings", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  seasonId: uuid("season_id")
-    .notNull()
-    .references(() => seasons.id),
-  playerId: uuid("player_id")
-    .notNull()
-    .references(() => players.id),
-  position: text("position").$type<Position>().notNull(),
-  rating: integer("rating").notNull(),
-  rater: text("rater").notNull(),
-  createdByUserId: uuid("created_by_user_id").references(() => users.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const positionRatings = pgTable(
+  "position_ratings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => seasons.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    position: text("position").$type<Position>().notNull(),
+    rating: integer("rating").notNull(),
+    rater: text("rater").notNull(),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  // Append-only and grows forever; every current-matrix read filters by
+  // season and orders by recency (getCurrentRatings), feeding lineups,
+  // depth, practice, and reports.
+  (t) => [index("position_ratings_season_created").on(t.seasonId, t.createdAt)],
+);
 
 // Quick coach ratings (goal 2): 1–5 per dimension, append-only so every
 // snapshot is dated and trends are visible. Tagged with context (practice /
@@ -485,7 +492,12 @@ export const pitchCounts = pgTable(
     pitches: integer("pitches").notNull().default(0),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("pitch_once").on(t.gameId, t.playerId, t.inning)],
+  (t) => [
+    uniqueIndex("pitch_once").on(t.gameId, t.playerId, t.inning),
+    // Pitch-Smart eligibility is looked up by player across all games
+    // (pitchHistoriesFor) on every dugout snapshot.
+    index("pitch_counts_player").on(t.playerId),
+  ],
 );
 
 // Stats (goal 5). GameChanger stays the scorer; its season export imports

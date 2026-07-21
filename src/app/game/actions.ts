@@ -248,16 +248,20 @@ export async function createGame(formData: FormData): Promise<void> {
     const a = solution.assignments[pos];
     if (a) assigned.set(a.playerId, pos);
   }
-  for (const p of pool) {
+  // Seed every inning for every player in one multi-row insert, not a
+  // round-trip per cell (a 12×6 game was ~72 sequential Neon-HTTP writes
+  // stalling the "create game" tap right before the dugout opens).
+  const assignmentValues = pool.flatMap((p) => {
     const slot = assigned.get(p.playerId) ?? BENCH;
-    for (let inning = 1; inning <= innings; inning++) {
-      await db.insert(tables.gameAssignments).values({
-        gameId: game.id,
-        inning,
-        playerId: p.playerId,
-        position: slot,
-      });
-    }
+    return Array.from({ length: innings }, (_, i) => ({
+      gameId: game.id,
+      inning: i + 1,
+      playerId: p.playerId,
+      position: slot,
+    }));
+  });
+  if (assignmentValues.length > 0) {
+    await db.insert(tables.gameAssignments).values(assignmentValues);
   }
 
   // Batting order seeded by overall blended strength, strongest first.
@@ -269,12 +273,13 @@ export async function createGame(formData: FormData): Promise<void> {
     return sum / m.size;
   };
   const ordered = [...pool].sort((a, b) => overall(b.playerId) - overall(a.playerId));
-  for (let i = 0; i < ordered.length; i++) {
-    await db.insert(tables.battingOrders).values({
-      gameId: game.id,
-      playerId: ordered[i].playerId,
-      spot: i + 1,
-    });
+  const orderValues = ordered.map((p, i) => ({
+    gameId: game.id,
+    playerId: p.playerId,
+    spot: i + 1,
+  }));
+  if (orderValues.length > 0) {
+    await db.insert(tables.battingOrders).values(orderValues);
   }
 
   await logGameEdit({
@@ -432,8 +437,9 @@ async function solveInningsRange(
   const roles = rolesByPlayerFrom(await getPositionRoles(game.seasonId));
 
   const resting = new Set<string>();
+  const restHistories = await pitchHistoriesFor(playerIds);
   for (const pid of playerIds) {
-    const e = pitchEligibility(await pitchHistory(pid), game.gameDate);
+    const e = pitchEligibility(restHistories.get(pid) ?? [], game.gameDate);
     if (!e.eligible) resting.add(pid);
   }
 
@@ -510,11 +516,14 @@ export async function planFullGame(
   const actor = initialsOf(user.displayName);
   const sat: Record<string, number> = {};
   for (const pid of playerIds) sat[pid] = 0;
+  // Solve through any extra innings already reached; declared arms only
+  // exist for 1..game.innings, so extra innings fall to solver-picked
+  // eligible arms (Pitch Smart still zeroes resting ones).
   await solveInningsRange(
     game,
     playerIds,
     1,
-    game.innings,
+    Math.max(game.currentInning, game.innings),
     (inning) => pitchers[inning - 1] ?? null,
     sat,
     mode,
@@ -583,6 +592,9 @@ export async function addPlayerToGame(
   await db
     .insert(tables.battingOrders)
     .values({ gameId, playerId, spot: nextSpot });
+  // Two coaches adding late arrivals at once can compute the same next
+  // spot; the sweep heals the duplicate so "who's up" stays correct.
+  await renumberBattingOrder(gameId);
   await logGameEdit({
     gameId,
     section: "field",
@@ -699,20 +711,73 @@ export async function addPitches(
 
 /** Pitch history (day totals) for a player across all games. */
 async function pitchHistory(playerId: string): Promise<DayPitches[]> {
+  return (await pitchHistoriesFor([playerId])).get(playerId) ?? [];
+}
+
+/**
+ * Pitch history (per-day totals) for many players in ONE query — the
+ * batched form the live snapshot and the solver's resting-arm check use.
+ * Prod speaks Neon SQL-over-HTTP where each await is a round-trip, so
+ * fetching eligibility per player was ~one request per kid on every 15s
+ * poll for every open dugout screen; this collapses that to a single
+ * IN-scan (served by pitch_counts_player). Totals are kept per
+ * (player, day) — Pitch Smart's daily cap is a per-day number.
+ */
+async function pitchHistoriesFor(
+  playerIds: readonly string[],
+): Promise<Map<string, DayPitches[]>> {
+  const out = new Map<string, DayPitches[]>();
+  if (playerIds.length === 0) return out;
   const db = await getDb();
   const rows = await db
     .select({
+      playerId: tables.pitchCounts.playerId,
       pitches: tables.pitchCounts.pitches,
       day: tables.liveGames.gameDate,
     })
     .from(tables.pitchCounts)
     .innerJoin(tables.liveGames, eq(tables.pitchCounts.gameId, tables.liveGames.id))
-    .where(eq(tables.pitchCounts.playerId, playerId));
-  const byDay = new Map<string, number>();
+    .where(inArray(tables.pitchCounts.playerId, [...playerIds]));
+  const byPlayerDay = new Map<string, Map<string, number>>();
   for (const r of rows) {
-    byDay.set(r.day, (byDay.get(r.day) ?? 0) + r.pitches);
+    const days = byPlayerDay.get(r.playerId) ?? new Map<string, number>();
+    days.set(r.day, (days.get(r.day) ?? 0) + r.pitches);
+    byPlayerDay.set(r.playerId, days);
   }
-  return [...byDay.entries()].map(([day, pitches]) => ({ day, pitches }));
+  for (const pid of playerIds) {
+    const days = byPlayerDay.get(pid);
+    out.set(
+      pid,
+      days ? [...days.entries()].map(([day, pitches]) => ({ day, pitches })) : [],
+    );
+  }
+  return out;
+}
+
+/**
+ * Renumber a game's batting order to a dense 1..n, deterministically
+ * (by spot then playerId). Every batting write ends with this sweep so
+ * concurrent edits from several dugout screens — arrow swaps or two
+ * late-arrival adds computing the same next spot — converge on one valid
+ * order instead of leaving duplicate or gapped spots.
+ */
+async function renumberBattingOrder(gameId: string): Promise<void> {
+  const db = await getDb();
+  const rows = await db
+    .select()
+    .from(tables.battingOrders)
+    .where(eq(tables.battingOrders.gameId, gameId));
+  const normalized = rows.sort(
+    (x, y) => x.spot - y.spot || x.playerId.localeCompare(y.playerId),
+  );
+  for (let i = 0; i < normalized.length; i++) {
+    if (normalized[i].spot !== i + 1) {
+      await db
+        .update(tables.battingOrders)
+        .set({ spot: i + 1 })
+        .where(eq(tables.battingOrders.id, normalized[i].id));
+    }
+  }
 }
 
 export interface MoveResult {
@@ -759,33 +824,39 @@ export async function moveGamePlayer(
   if (!current.has(playerId)) return { ok: false, warning: "Player not in this game." };
 
   const actor = initialsOf(user.displayName);
-  const plan = planMove(current, playerId, target, game.currentInning, game.innings);
-  for (const s of plan.set) {
-    const [existing] = await db
-      .select({ id: tables.gameAssignments.id })
-      .from(tables.gameAssignments)
-      .where(
-        and(
-          eq(tables.gameAssignments.gameId, gameId),
-          eq(tables.gameAssignments.inning, s.inning),
-          eq(tables.gameAssignments.playerId, s.playerId),
-        ),
+  // Bound the move by the inning actually reached, not the configured
+  // length — extra innings (a tie going long) are seeded past game.innings
+  // and must be movable. In regulation this equals game.innings.
+  const lastInning = Math.max(game.currentInning, game.innings);
+  const plan = planMove(current, playerId, target, game.currentInning, lastInning);
+  // One upsert for the whole plan instead of a SELECT-probe + branch per
+  // row — a single swap was ~2 round-trips per remaining inning. The
+  // conflict target is the (game, inning, player) uniqueness, so an
+  // existing cell is updated in place and the read-then-write race is gone.
+  if (plan.set.length > 0) {
+    await db
+      .insert(tables.gameAssignments)
+      .values(
+        plan.set.map((s) => ({
+          gameId,
+          inning: s.inning,
+          playerId: s.playerId,
+          position: s.position,
+          updatedBy: actor,
+        })),
       )
-      .limit(1);
-    if (existing) {
-      await db
-        .update(tables.gameAssignments)
-        .set({ position: s.position, updatedBy: actor, updatedAt: new Date() })
-        .where(eq(tables.gameAssignments.id, existing.id));
-    } else {
-      await db.insert(tables.gameAssignments).values({
-        gameId,
-        inning: s.inning,
-        playerId: s.playerId,
-        position: s.position,
-        updatedBy: actor,
+      .onConflictDoUpdate({
+        target: [
+          tables.gameAssignments.gameId,
+          tables.gameAssignments.inning,
+          tables.gameAssignments.playerId,
+        ],
+        set: {
+          position: sql`excluded.position`,
+          updatedBy: actor,
+          updatedAt: new Date(),
+        },
       });
-    }
   }
   // If another screen's move crossed with this one, resolve any
   // double-booked slot now — newest write keeps it, visibly.
@@ -830,24 +901,9 @@ export async function swapBattingSpot(
     .update(tables.battingOrders)
     .set({ spot: a.spot })
     .where(eq(tables.battingOrders.id, b.id));
-  // Arrow taps from two screens can cross and leave duplicate spots.
-  // Renumber 1..n deterministically so every device converges on one
-  // valid order (each write ends with this sweep — the last one wins).
-  const after = await db
-    .select()
-    .from(tables.battingOrders)
-    .where(eq(tables.battingOrders.gameId, gameId));
-  const normalized = after.sort(
-    (x, y) => x.spot - y.spot || x.playerId.localeCompare(y.playerId),
-  );
-  for (let i = 0; i < normalized.length; i++) {
-    if (normalized[i].spot !== i + 1) {
-      await db
-        .update(tables.battingOrders)
-        .set({ spot: i + 1 })
-        .where(eq(tables.battingOrders.id, normalized[i].id));
-    }
-  }
+  // Arrow taps from two screens can cross and leave duplicate spots; the
+  // shared sweep renumbers 1..n so every device converges (last write wins).
+  await renumberBattingOrder(gameId);
   await logGameEdit({
     gameId,
     section: "order",
@@ -908,11 +964,14 @@ export async function autoArrangeField(
   }
 
   const actor = initialsOf(user.displayName);
+  // Cover extra innings too — a tie going long is exactly when re-arranging
+  // the field matters. In regulation this equals game.innings.
+  const lastInning = Math.max(game.currentInning, game.innings);
   await solveInningsRange(
     game,
     playerIds,
     game.currentInning,
-    game.innings,
+    lastInning,
     (inning) => pitcherByInning[inning] ?? null,
     sat,
     mode,
@@ -922,7 +981,7 @@ export async function autoArrangeField(
   await logGameEdit({
     gameId,
     section: "plan",
-    summary: `auto-arranged innings ${game.currentInning}–${game.innings} (${
+    summary: `auto-arranged innings ${game.currentInning}–${lastInning} (${
       mode === "develop" ? "up big" : "close game"
     })`,
     user,
@@ -1093,13 +1152,16 @@ export async function gameSnapshot(gameId: string) {
     : [];
 
   // Eligibility for everyone (bench chips warn before a bad move is tried).
+  // One batched query for the whole roster — this snapshot re-runs on the
+  // 15s poll for every open dugout screen, so a per-player round-trip here
+  // was the dominant recurring cost.
   const eligibility: Record<
     string,
     { eligible: boolean; remaining: number; reason: string | null }
   > = {};
+  const histories = await pitchHistoriesFor(playerIds);
   for (const pid of playerIds) {
-    const history = await pitchHistory(pid);
-    const e = pitchEligibility(history, game.gameDate);
+    const e = pitchEligibility(histories.get(pid) ?? [], game.gameDate);
     eligibility[pid] = {
       eligible: e.eligible,
       remaining: e.pitchesRemainingToday,

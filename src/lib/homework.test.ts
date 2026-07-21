@@ -250,6 +250,27 @@ describe("teamGaps", () => {
     expect(teamGaps(summaries).map((g) => g.dimension)).not.toContain("d8");
     expect(teamGaps(summaries).map((g) => g.dimension)).not.toContain("d1");
   });
+
+  it("gates the P/C role modules to kids who fill the role", () => {
+    const withRole = new Map<string, Map<BarsKey, BarsCell>>([
+      ["p1", new Map([["pitching", cell(2)]])],
+      ["p2", new Map([["pitching", cell(2)]])], // rated at P but not a pitcher
+    ]);
+    // No role map → counts both (backward compatible).
+    expect(teamGaps(withRole).map((g) => g.dimension)).toContain("pitching");
+    // With a role map where neither is a pitcher → pitching is not a team gap.
+    const roles = new Map([
+      ["p1", { pitcher: false, catcher: false }],
+      ["p2", { pitcher: false, catcher: false }],
+    ]);
+    expect(teamGaps(withRole, roles)).toEqual([]);
+    // One real pitcher isn't enough for a team theme; two are.
+    const bothPitch = new Map([
+      ["p1", { pitcher: true, catcher: false }],
+      ["p2", { pitcher: true, catcher: false }],
+    ]);
+    expect(teamGaps(withRole, bothPitch)[0]?.dimension).toBe("pitching");
+  });
 });
 
 describe("searchCatalog", () => {
