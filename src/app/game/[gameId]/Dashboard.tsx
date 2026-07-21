@@ -15,6 +15,7 @@ import {
   swapBattingSpot,
 } from "@/app/game/actions";
 import { BENCH } from "@/lib/gameday";
+import { relTime } from "@/lib/format";
 import { roleWeights, type LineupMode, type RolesByPlayer } from "@/lib/depth";
 import { auditLineup, gapFillOptions, positionDepth, type Move } from "@/lib/recommend";
 
@@ -136,6 +137,10 @@ interface Props {
   addablePlayers: { id: string; name: string; practice: boolean }[];
   score: { inning: number; side: "us" | "them"; runs: number }[];
   battingOrder: { playerId: string; spot: number }[];
+  /** The shared-editing trail, newest first — who touched what, when. */
+  recentEdits: { id: string; section: string; summary: string; actor: string; atMs: number }[];
+  /** The signed-in coach's initials — "You" in the trail, flash filter. */
+  myInitials: string;
 }
 
 export function Dashboard(props: Props) {
@@ -184,6 +189,21 @@ export function Dashboard(props: Props) {
     const t = setInterval(() => router.refresh(), 15_000);
     return () => clearInterval(t);
   }, [router]);
+
+  // When a refresh brings in ANOTHER coach's edit, flash the trail strip
+  // for a few seconds — the "someone else just changed something" cue.
+  const latestEdit = props.recentEdits[0] ?? null;
+  const [remoteFlash, setRemoteFlash] = useState(false);
+  const seenEditId = useRef(latestEdit?.id ?? null);
+  useEffect(() => {
+    if (!latestEdit || seenEditId.current === latestEdit.id) return;
+    seenEditId.current = latestEdit.id;
+    if (latestEdit.actor === props.myInitials) return;
+    setRemoteFlash(true);
+    const t = window.setTimeout(() => setRemoteFlash(false), 6000);
+    return () => window.clearTimeout(t);
+  }, [latestEdit, props.myInitials]);
+  const editWho = (actor: string) => (actor === props.myInitials ? "You" : actor);
 
   const nameOf = useMemo(() => {
     const m = new Map(players.map((p) => [p.id, `${p.firstName} ${p.lastName.slice(0, 1)}.`]));
@@ -479,6 +499,39 @@ export function Dashboard(props: Props) {
           </button>
         </span>
       </div>
+
+      {/* The shared-editing trail: three coaches can run this game at
+          once, and this strip says whose change you're looking at. It
+          flashes when a sync pulls in someone else's edit. Coach view
+          only — the dugout board stays clean for player eyes. */}
+      {!board && latestEdit && (
+        <details
+          data-testid="edit-log"
+          className={`rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs transition-shadow ${
+            remoteFlash ? "ring-2 ring-amber-400" : ""
+          }`}
+        >
+          <summary className="cursor-pointer font-semibold text-neutral-600">
+            ✎ <b>{editWho(latestEdit.actor)}</b> · {latestEdit.summary} ·{" "}
+            <span suppressHydrationWarning>{relTime(latestEdit.atMs, Date.now())}</span>
+            {remoteFlash && (
+              <span className="ml-1.5 rounded bg-amber-300 px-1 py-0.5 font-bold uppercase">
+                just updated
+              </span>
+            )}
+          </summary>
+          <ul className="mt-1.5 space-y-0.5 border-t border-line pt-1.5">
+            {props.recentEdits.map((e) => (
+              <li key={e.id} className="font-semibold text-neutral-600">
+                <b>{editWho(e.actor)}</b> {e.summary}
+                <span suppressHydrationWarning className="text-neutral-400">
+                  {" "}· {relTime(e.atMs, Date.now())}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {warning && (
         <div className="card border-red-700 bg-amber-50 p-3">

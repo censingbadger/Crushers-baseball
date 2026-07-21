@@ -99,3 +99,38 @@ export function emptyPositions(current: Map<string, string>): string[] {
   const filled = new Set(current.values());
   return POSITIONS.filter((p) => !filled.has(p));
 }
+
+export interface OccupancyRow {
+  playerId: string;
+  position: string;
+  updatedAtMs: number;
+}
+
+/**
+ * Two dugout screens editing at once can land two players on the same
+ * position for an inning — each write is per-player, and serverless
+ * Postgres-over-HTTP gives us no cross-row transactions to prevent it.
+ * Resolve deterministically instead: per double-held field slot, the
+ * newest write keeps it and everyone else goes to the bench (last tap
+ * wins, same as the rest of the dugout). Ties break by playerId so every
+ * device heals to the identical answer. Returns the playerIds to bench;
+ * the bench itself can hold any number of players.
+ */
+export function duplicateOccupants(rows: OccupancyRow[]): string[] {
+  const bySlot = new Map<string, OccupancyRow[]>();
+  for (const r of rows) {
+    if (r.position === BENCH) continue;
+    const list = bySlot.get(r.position) ?? [];
+    list.push(r);
+    bySlot.set(r.position, list);
+  }
+  const bench: string[] = [];
+  for (const list of bySlot.values()) {
+    if (list.length < 2) continue;
+    const sorted = [...list].sort(
+      (a, b) => b.updatedAtMs - a.updatedAtMs || a.playerId.localeCompare(b.playerId),
+    );
+    for (const loser of sorted.slice(1)) bench.push(loser.playerId);
+  }
+  return bench;
+}

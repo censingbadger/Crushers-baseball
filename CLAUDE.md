@@ -61,6 +61,19 @@
   panel holds facts, guardian contacts (mailto/tel), matrix, BARS
   levels, GC season, playing time, and the Edit link; parents see a
   simple list with only the self-reported positions text.
+- **Multi-coach dugout**: several coaches run the same game at once, so
+  every dugout write is lock-free and conflict-safe — prod speaks Neon
+  SQL-over-HTTP (no interactive transactions; keep it that way). Pitch
+  counts increment atomically in SQL (never read-then-write); field
+  moves stamp `updated_by`/`updated_at` and end with a double-booking
+  heal (newest write keeps a slot, the loser is benched visibly);
+  batting-order swaps renumber 1..n after writing. Every meaningful
+  write logs to `game_edits` with the coach's initials (append-mostly;
+  same-coach bursts coalesce via coalesceKey). Game day shows the trail
+  strip (coach view only, never the board) and flashes when the 15s
+  sync poll pulls in another coach's edit. Rating pages (BARS, quick
+  entry) are per-coach append-only tables — safe to use concurrently
+  with a live dugout by design.
 - **BARS feedback (`src/lib/bars.ts`, `bars_ratings`)**: player feedback
   is criterion-referenced 1–5 (3 = the 11U standard) across D1–D9 + P/C
   role modules, with full behavioral anchors on screen during entry.
