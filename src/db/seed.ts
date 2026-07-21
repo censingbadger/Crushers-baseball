@@ -211,6 +211,33 @@ async function main() {
     }
   }
 
+  // A first pass of BARS feedback so the Performance pages (feedback,
+  // reports, homework) have life: a few below-standard levels create
+  // homework gaps. Fictional demo players only, as always.
+  const barsSeed: [number, import("@/lib/bars").BarsKey, number, string][] = [
+    [0, "d1", 4, "CD"],
+    [0, "d5", 3, "CD"],
+    [0, "d8", 3, "AB"],
+    [1, "d1", 3, "CD"],
+    [1, "d3", 2, "CD"],
+    [1, "d6", 2, "AB"],
+    [1, "d8", 2, "CD"],
+    [2, "d2", 2, "CD"],
+    [2, "d7", 3, "CD"],
+    [3, "d4", 2, "AB"],
+    [3, "d9", 3, "CD"],
+  ];
+  for (const [idx, dimension, level, rater] of barsSeed) {
+    await db.insert(tables.barsRatings).values({
+      seasonId: season.id,
+      playerId: playerIds[idx],
+      dimension,
+      rater,
+      level,
+      day: isoDay(-2),
+    });
+  }
+
   // Tournament-weekend availability for two future weekends.
   for (const offset of [19, 20, 21, 26, 27, 28]) {
     for (let i = 0; i < playerIds.length; i++) {

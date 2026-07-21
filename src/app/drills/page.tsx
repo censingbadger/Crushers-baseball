@@ -1,9 +1,18 @@
 import { asc } from "drizzle-orm";
 import { getDb, tables } from "@/db";
 import { requireCoach } from "@/lib/auth";
+import { STARTER_DRILLS } from "@/lib/drills";
 import { addDrill, loadStarterDrills, toggleDrill } from "./actions";
 
-const CATEGORIES = ["hitting", "fielding", "throwing", "pitching", "speed", "fun"] as const;
+const CATEGORIES = [
+  "hitting",
+  "fielding",
+  "throwing",
+  "pitching",
+  "speed",
+  "mental",
+  "fun",
+] as const;
 
 export default async function DrillsPage() {
   await requireCoach();
@@ -27,8 +36,9 @@ export default async function DrillsPage() {
       {drills.length === 0 && (
         <form action={loadStarterDrills} className="card flex flex-wrap items-center gap-3 p-4">
           <p className="text-sm font-semibold">
-            Empty library — load the curated starter set (8 drills) and edit
-            from there.
+            Empty library — load the researched starter set (
+            {STARTER_DRILLS.length} drills, from the homework catalog) and
+            edit from there.
           </p>
           <button className="btn btn-primary" type="submit">
             Load starter drills

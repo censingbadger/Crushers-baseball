@@ -44,6 +44,7 @@ const COACH_ENTRIES: NavEntry[] = [
       { href: "/matrix", label: "Position matrix" },
       { href: "/depth", label: "Depth chart" },
       { href: "/rate", label: "Player feedback" },
+      { href: "/homework", label: "Homework" },
       { href: "/stats", label: "Stats" },
       { href: "/reports", label: "Reports" },
     ],
