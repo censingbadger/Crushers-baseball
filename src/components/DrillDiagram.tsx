@@ -89,7 +89,7 @@ function WallBall() {
       {/* player */}
       <circle cx={45} cy={78} r="7" fill={BLUE} stroke={INK} />
       <path d="M 45 85 L 45 100 M 45 90 L 33 98 M 45 90 L 58 96 M 45 100 L 38 110 M 45 100 L 53 110" stroke={INK} strokeWidth="2" fill="none" />
-      <Label x={45} y={126}>athletic stance, glove out front</Label>
+      <Label x={70} y={126}>ready stance, glove out front</Label>
       {/* throw and rebound */}
       <Arrow d="M 58 88 C 110 78 150 82 179 92" />
       <Arrow d="M 179 98 C 140 104 100 106 62 102" color={BLUE_DARK} />
@@ -131,12 +131,12 @@ function ThrowingLane() {
       {/* feet (overhead ovals) aligned to target */}
       <ellipse cx={38} cy={62} rx="5" ry="10" fill={BLUE} stroke={INK} transform="rotate(80 38 62)" />
       <ellipse cx={62} cy={74} rx="5" ry="10" fill={BLUE} stroke={INK} transform="rotate(80 62 74)" />
-      <Label x={46} y={94}>back foot · front foot</Label>
-      <Label x={46} y={104}>both point sideways to target</Label>
+      <Label x={62} y={94}>back foot · front foot</Label>
+      <Label x={78} y={104}>point sideways to the target</Label>
       {/* alignment + throw */}
       <Arrow d="M 30 68 L 172 68" color={BLUE_DARK} dash />
       <Arrow d="M 70 68 C 110 58 140 60 174 66" />
-      <Label x={112} y={44}>shoulders stay on this line</Label>
+      <Label x={100} y={40}>shoulders stay on this line</Label>
     </Frame>
   );
 }

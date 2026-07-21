@@ -141,3 +141,21 @@ h1 {
   letter-spacing: 0.04em;
 }
 }
+
+/* Homework handouts: print only the sheets — no app chrome — and give
+   each player his own page. */
+@media print {
+  header,
+  footer,
+  .print-hide {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  .print-sheet {
+    break-after: page;
+    border: none;
+    box-shadow: none;
+  }
+}
