@@ -81,6 +81,28 @@ describe("barsSummary", () => {
     ];
     expect(barsSummary(rows).get("a")!.get("d1")!.direction).toBe("up");
   });
+
+  it("keeps two coaches who share initials distinct (no supersede)", () => {
+    // Mike Christian and Maria Cruz both file under "MC" — different users.
+    const rows = [
+      row({ rater: "MC", createdByUserId: "u-mike", level: 2, createdAt: at(1) }),
+      row({ rater: "MC", createdByUserId: "u-maria", level: 4, createdAt: at(2) }),
+    ];
+    const cell = barsSummary(rows).get("a")!.get("d1")!;
+    expect(cell.raters).toBe(2); // two distinct observers, not one
+    expect(cell.median).toBe(3); // median(2, 4)
+    expect(cell.flagged).toBe(true); // their disagreement is surfaced
+  });
+
+  it("still collapses one coach's repeated ratings (same user)", () => {
+    const rows = [
+      row({ rater: "MC", createdByUserId: "u-mike", level: 2, createdAt: at(1) }),
+      row({ rater: "MC", createdByUserId: "u-mike", level: 5, createdAt: at(3) }),
+    ];
+    const cell = barsSummary(rows).get("a")!.get("d1")!;
+    expect(cell.raters).toBe(1);
+    expect(cell.median).toBe(5); // latest wins
+  });
 });
 
 describe("youngestQuartile", () => {

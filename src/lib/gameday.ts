@@ -56,36 +56,43 @@ export interface MovePlan {
 }
 
 /**
- * Plan a move: put `playerId` at `target` from `inning` onward. If another
- * player currently holds a target position, they take the mover's old slot
- * (a swap); moving to the bench simply benches the mover and leaves the
- * vacated position empty for a follow-up choice.
+ * Plan a move: put `playerId` at `target` for every inning in
+ * [fromInning, toInning], resolving the swap PER INNING against that
+ * inning's own alignment (`byInning`: inning → playerId → slot). A
+ * planned game holds a different lineup each inning, so the player
+ * displaced at `target`, and the slot `playerId` vacates, must be read
+ * per inning — otherwise a drag in one inning stamps that inning's
+ * occupant across all the others and scrambles the plan (pulling a
+ * planned pitcher, double-booking a later inning, punching empty holes).
+ * The displaced occupant takes the mover's slot for that inning (a
+ * swap); a move to the bench just benches the mover, leaving the vacated
+ * spot open. Innings with no alignment yet (unseeded) are skipped, and
+ * an inning where the player already holds `target` is left untouched.
+ * A fresh game whose innings are identical resolves the same in each, so
+ * this is a no-op change for the unplanned case.
  */
 export function planMove(
-  current: Map<string, string>,
+  byInning: Map<number, Map<string, string>>,
   playerId: string,
   target: Slot,
-  inning: number,
-  totalInnings: number,
+  fromInning: number,
+  toInning: number,
 ): MovePlan {
-  const from = current.get(playerId) ?? BENCH;
   const set: MovePlan["set"] = [];
-  const innings: number[] = [];
-  for (let i = inning; i <= totalInnings; i++) innings.push(i);
-
-  if (target === from) return { set };
-
-  let occupant: string | null = null;
-  if (target !== BENCH) {
-    for (const [pid, pos] of current) {
-      if (pos === target && pid !== playerId) {
-        occupant = pid;
-        break;
+  for (let i = fromInning; i <= toInning; i++) {
+    const map = byInning.get(i);
+    if (!map) continue;
+    const from = map.get(playerId) ?? BENCH;
+    if (target === from) continue;
+    let occupant: string | null = null;
+    if (target !== BENCH) {
+      for (const [pid, pos] of map) {
+        if (pos === target && pid !== playerId) {
+          occupant = pid;
+          break;
+        }
       }
     }
-  }
-
-  for (const i of innings) {
     set.push({ inning: i, playerId, position: target });
     if (occupant) {
       set.push({ inning: i, playerId: occupant, position: from });

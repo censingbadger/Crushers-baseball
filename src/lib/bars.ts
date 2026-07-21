@@ -256,6 +256,18 @@ export interface BarsRow {
   level: number; // 1-5, or 0 = not observed
   day: string; // ISO date
   createdAt: Date;
+  /** The coach who left the rating, when known. Two staff can share
+   * initials (e.g. two "MC"); grouping by (rater, user) instead of the
+   * initials alone keeps their observations distinct so the median and
+   * the "raters split" flag stay honest. Omitted → grouped by rater only
+   * (unchanged behavior for callers that don't load it). */
+  createdByUserId?: string | null;
+}
+
+/** Identity of a rater within an aggregation: the coach when known, else
+ * the label. See BarsRow.createdByUserId. */
+function raterIdentity(r: { rater: string; createdByUserId?: string | null }): string {
+  return `${r.rater}|${r.createdByUserId ?? ""}`;
 }
 
 export interface BarsCell {
@@ -286,7 +298,7 @@ export function median(values: number[]): number {
 export function barsSummary(
   rows: readonly BarsRow[],
 ): Map<string, Map<BarsKey, BarsCell>> {
-  // player -> dimension -> rater -> observed rows, newest last.
+  // player -> dimension -> rater-identity -> observed rows, newest last.
   const nested = new Map<string, Map<string, Map<string, BarsRow[]>>>();
   const sorted = [...rows].sort(
     (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
@@ -295,9 +307,10 @@ export function barsSummary(
     if (r.level === NOT_OBSERVED) continue;
     const byDim = nested.get(r.playerId) ?? new Map();
     const byRater = byDim.get(r.dimension) ?? new Map();
-    const list = byRater.get(r.rater) ?? [];
+    const id = raterIdentity(r);
+    const list = byRater.get(id) ?? [];
     list.push(r);
-    byRater.set(r.rater, list);
+    byRater.set(id, list);
     byDim.set(r.dimension, byRater);
     nested.set(r.playerId, byDim);
   }

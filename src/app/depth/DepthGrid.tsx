@@ -13,7 +13,7 @@ interface Player {
 type Role = "primary" | "secondary" | "develop" | "emergency" | "never";
 
 const ROLE_STYLE: Record<Role, string> = {
-  primary: "border-team-orange-dark bg-team-orange text-paper",
+  primary: "border-team-orange-dark bg-team-orange text-ink",
   secondary: "border-team-blue-dark bg-team-blue",
   develop: "border-line bg-team-blue-light",
   emergency: "border-dashed border-line bg-paper text-neutral-500",

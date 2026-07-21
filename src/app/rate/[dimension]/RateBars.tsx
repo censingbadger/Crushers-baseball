@@ -100,7 +100,7 @@ export function RateBars({
             <span className="flex items-baseline gap-2">
               <span
                 className={`w-5 shrink-0 rounded border border-line text-center text-sm font-extrabold ${
-                  lvl === 3 ? "bg-team-orange text-paper" : "bg-team-blue-light"
+                  lvl === 3 ? "bg-team-orange text-ink" : "bg-team-blue-light"
                 }`}
               >
                 {lvl}
@@ -175,7 +175,7 @@ export function RateBars({
                     onClick={() => tap(p.playerId, lvl)}
                     className={`h-9 w-9 rounded border text-sm font-extrabold transition ${
                       val === lvl
-                        ? "border-team-orange-dark bg-team-orange text-paper"
+                        ? "border-team-orange-dark bg-team-orange text-ink"
                         : "border-line bg-paper hover:bg-team-blue-light"
                     }`}
                   >

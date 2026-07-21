@@ -11,7 +11,7 @@ import { POSITIONS } from "@/db/schema";
 
 function ratingBg(v: number | undefined): string {
   if (v === undefined) return "";
-  if (v >= 8) return "bg-team-orange text-paper font-bold";
+  if (v >= 8) return "bg-team-orange text-ink font-bold";
   if (v >= 6) return "bg-team-blue font-semibold";
   if (v >= 4) return "bg-team-blue-light";
   return "text-neutral-500";

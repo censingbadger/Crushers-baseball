@@ -13,7 +13,7 @@ export default async function NewPlayerPage({
     <div className="mx-auto max-w-lg">
       <h1 className="mb-4 text-2xl font-extrabold">Add player</h1>
       {error && (
-        <p className="mb-3 rounded border border-line bg-team-orange px-3 py-2 text-sm font-semibold text-paper">
+        <p className="mb-3 rounded border border-line bg-team-orange px-3 py-2 text-sm font-semibold text-ink">
           Check the fields — the player couldn't be saved.
         </p>
       )}

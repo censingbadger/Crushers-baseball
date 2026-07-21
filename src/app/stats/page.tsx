@@ -421,7 +421,7 @@ export default async function StatsPage() {
           <ul className="divide-y divide-line">
             {games.map((g) => (
               <li key={g.id} className="flex flex-wrap items-center gap-2 py-2">
-                <span className={`chip ${g.source === "gc" ? "bg-team-blue-light" : "bg-team-orange text-paper"}`}>
+                <span className={`chip ${g.source === "gc" ? "bg-team-blue-light" : "bg-team-orange text-ink"}`}>
                   {g.source === "gc" ? "GC" : "Manual"}
                 </span>
                 <Link href={`/stats/game/${g.id}`} className="min-w-0 flex-1 basis-52 font-semibold underline-offset-2 hover:underline">

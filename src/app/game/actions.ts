@@ -811,24 +811,33 @@ export async function moveGamePlayer(
   }
 
   const db = await getDb();
+  // Load every inning from the current one onward and resolve the move
+  // per inning — a planned game has a distinct alignment each inning, so
+  // the swap must read each inning's own occupants (see planMove). Bound
+  // by the inning actually reached, so extra innings (a tie going long,
+  // seeded past game.innings) are movable; in regulation this is
+  // game.innings.
+  const lastInning = Math.max(game.currentInning, game.innings);
   const rows = await db
     .select()
     .from(tables.gameAssignments)
     .where(
       and(
         eq(tables.gameAssignments.gameId, gameId),
-        eq(tables.gameAssignments.inning, game.currentInning),
+        gte(tables.gameAssignments.inning, game.currentInning),
       ),
     );
-  const current = new Map(rows.map((r) => [r.playerId, r.position]));
+  const byInning = new Map<number, Map<string, string>>();
+  for (const r of rows) {
+    const m = byInning.get(r.inning) ?? new Map<string, string>();
+    m.set(r.playerId, r.position);
+    byInning.set(r.inning, m);
+  }
+  const current = byInning.get(game.currentInning) ?? new Map<string, string>();
   if (!current.has(playerId)) return { ok: false, warning: "Player not in this game." };
 
   const actor = initialsOf(user.displayName);
-  // Bound the move by the inning actually reached, not the configured
-  // length — extra innings (a tie going long) are seeded past game.innings
-  // and must be movable. In regulation this equals game.innings.
-  const lastInning = Math.max(game.currentInning, game.innings);
-  const plan = planMove(current, playerId, target, game.currentInning, lastInning);
+  const plan = planMove(byInning, playerId, target, game.currentInning, lastInning);
   // One upsert for the whole plan instead of a SELECT-probe + branch per
   // row — a single swap was ~2 round-trips per remaining inning. The
   // conflict target is the (game, inning, player) uniqueness, so an

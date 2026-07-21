@@ -92,7 +92,7 @@ export function QuickRate({
                     onClick={() => tap(pos, n)}
                     className={`min-h-[44px] rounded border py-2.5 text-center text-sm font-bold transition ${
                       active
-                        ? "border-team-orange-dark bg-team-orange text-paper"
+                        ? "border-team-orange-dark bg-team-orange text-ink"
                         : "border-line bg-paper hover:bg-team-blue-light"
                     }`}
                   >
@@ -143,7 +143,7 @@ export function QuickRate({
             onClick={() => setIdx(i)}
             className={`rounded-full border px-2 py-0.5 text-xs font-bold ${
               i === idx
-                ? "border-team-orange-dark bg-team-orange text-paper"
+                ? "border-team-orange-dark bg-team-orange text-ink"
                 : ratedCount(p.playerId) === 9
                   ? "border-line bg-team-blue-light"
                   : "border-line bg-paper"
