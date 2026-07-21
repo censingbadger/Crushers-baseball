@@ -42,3 +42,14 @@ export const RSVP_LABEL: Record<string, string> = {
   no: "Out",
   maybe: "Maybe",
 };
+
+/** "just now" / "45s ago" / "3m ago" / "2h 05m ago" — the edit trail's clock. */
+export function relTime(atMs: number, nowMs: number): string {
+  const s = Math.max(0, Math.floor((nowMs - atMs) / 1000));
+  if (s < 10) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${String(m % 60).padStart(2, "0")}m ago`;
+}

@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, tables } from "@/db";
-import { POSITIONS } from "@/db/schema";
-import { requireCoach } from "@/lib/auth";
+import { POSITIONS, type GameEditSection } from "@/db/schema";
+import { requireCoach, type CurrentUser } from "@/lib/auth";
 import { getPositionRoles, getRoster, getRsvpsForEvents } from "@/lib/data";
 import { blendedLookup, getCurrentRatings } from "@/lib/matrix";
 import { barsSummary } from "@/lib/bars";
@@ -17,7 +17,9 @@ import {
   type LineupMode,
 } from "@/lib/depth";
 import { solveLineup, type LineupCandidate } from "@/lib/lineup";
-import { BENCH, planMove, type Slot } from "@/lib/gameday";
+import { BENCH, duplicateOccupants, planMove, type Slot } from "@/lib/gameday";
+import { shouldCoalesce } from "@/lib/gamelog";
+import { initialsOf } from "@/lib/format";
 import { pitchEligibility, type DayPitches } from "@/lib/pitchsmart";
 import { suggestBattingOrder, type BatterInput } from "@/lib/batting";
 import { getSeasonBattingByPlayer } from "@/lib/performance";
@@ -39,6 +41,122 @@ function ratingsRecordOf(
   return out;
 }
 
+/** "Milo Vance" → "Milo V." — how the trail and the chips name players. */
+async function shortNameOf(playerId: string): Promise<string> {
+  const db = await getDb();
+  const [p] = await db
+    .select({
+      firstName: tables.players.firstName,
+      lastName: tables.players.lastName,
+    })
+    .from(tables.players)
+    .where(eq(tables.players.id, playerId))
+    .limit(1);
+  return p ? `${p.firstName} ${p.lastName.charAt(0)}.` : "?";
+}
+
+/**
+ * Write to the shared-editing trail (game_edits) — several coaches run
+ * the same dugout at once, and each screen shows who changed what last.
+ * With a coalesceKey, a rapid burst by the same coach (pitch taps, order
+ * arrows, inning steps) updates its latest row instead of flooding the
+ * feed; anyone else's edit in between breaks the run (shouldCoalesce).
+ */
+async function logGameEdit(edit: {
+  gameId: string;
+  section: GameEditSection;
+  summary: string;
+  user: CurrentUser;
+  coalesceKey?: string;
+}): Promise<void> {
+  const db = await getDb();
+  const actor = initialsOf(edit.user.displayName);
+  const [latest] = await db
+    .select()
+    .from(tables.gameEdits)
+    .where(eq(tables.gameEdits.gameId, edit.gameId))
+    .orderBy(desc(tables.gameEdits.at))
+    .limit(1);
+  if (
+    latest &&
+    shouldCoalesce(
+      { actor: latest.actor, coalesceKey: latest.coalesceKey, atMs: latest.at.getTime() },
+      { actor, coalesceKey: edit.coalesceKey ?? null },
+      Date.now(),
+    )
+  ) {
+    await db
+      .update(tables.gameEdits)
+      .set({ summary: edit.summary, at: new Date() })
+      .where(eq(tables.gameEdits.id, latest.id));
+    return;
+  }
+  await db.insert(tables.gameEdits).values({
+    gameId: edit.gameId,
+    section: edit.section,
+    summary: edit.summary,
+    actor,
+    createdByUserId: edit.user.id,
+    coalesceKey: edit.coalesceKey ?? null,
+  });
+}
+
+/**
+ * Two screens writing at once can double-book a position (each field
+ * write is per-player, and serverless Postgres-over-HTTP has no
+ * transactions to prevent the interleave). After any field write, sweep
+ * the innings it touched: the newest write keeps a double-held slot and
+ * the earlier occupant returns to the bench — last tap wins, visibly,
+ * instead of a player silently vanishing from the diamond. Idempotent,
+ * so every device heals to the same answer. Returns the names benched.
+ */
+async function healDoubleBookings(
+  gameId: string,
+  fromInning: number,
+  actor: string,
+): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db
+    .select()
+    .from(tables.gameAssignments)
+    .where(
+      and(
+        eq(tables.gameAssignments.gameId, gameId),
+        gte(tables.gameAssignments.inning, fromInning),
+      ),
+    );
+  const byInning = new Map<number, typeof rows>();
+  for (const r of rows) {
+    const list = byInning.get(r.inning) ?? [];
+    list.push(r);
+    byInning.set(r.inning, list);
+  }
+  const benched = new Set<string>();
+  for (const [inning, list] of byInning) {
+    const losers = duplicateOccupants(
+      list.map((r) => ({
+        playerId: r.playerId,
+        position: r.position,
+        updatedAtMs: r.updatedAt.getTime(),
+      })),
+    );
+    for (const pid of losers) {
+      await db
+        .update(tables.gameAssignments)
+        .set({ position: BENCH, updatedBy: actor, updatedAt: new Date() })
+        .where(
+          and(
+            eq(tables.gameAssignments.gameId, gameId),
+            eq(tables.gameAssignments.inning, inning),
+            eq(tables.gameAssignments.playerId, pid),
+          ),
+        );
+      benched.add(pid);
+    }
+  }
+  return Promise.all([...benched].map(shortNameOf));
+}
+
 const createSchema = z.object({
   // Empty string = "quick game": we create a schedule event on the fly so
   // the dugout works even when no game is on the calendar yet.
@@ -49,7 +167,7 @@ const createSchema = z.object({
 });
 
 export async function createGame(formData: FormData): Promise<void> {
-  await requireCoach();
+  const user = await requireCoach();
   const parsed = createSchema.safeParse({
     eventId: formData.get("eventId") ?? "",
     label: formData.get("label"),
@@ -159,6 +277,12 @@ export async function createGame(formData: FormData): Promise<void> {
     });
   }
 
+  await logGameEdit({
+    gameId: game.id,
+    section: "game",
+    summary: "created the game (seeded lineup & batting order)",
+    user,
+  });
   revalidatePath("/games");
   redirect(`/game/${game.id}`);
 }
@@ -174,28 +298,30 @@ async function loadGame(gameId: string) {
 }
 
 export async function startGame(gameId: string): Promise<void> {
-  await requireCoach();
+  const user = await requireCoach();
   const db = await getDb();
   await db
     .update(tables.liveGames)
     .set({ status: "live", startedAt: new Date() })
     .where(eq(tables.liveGames.id, gameId));
+  await logGameEdit({ gameId, section: "game", summary: "started the game", user });
   revalidatePath(`/game/${gameId}`);
 }
 
 export async function finishGame(gameId: string): Promise<void> {
-  await requireCoach();
+  const user = await requireCoach();
   const db = await getDb();
   await db
     .update(tables.liveGames)
     .set({ status: "final" })
     .where(eq(tables.liveGames.id, gameId));
+  await logGameEdit({ gameId, section: "game", summary: "marked the game final", user });
   revalidatePath(`/game/${gameId}`);
   revalidatePath("/games");
 }
 
 export async function setInning(gameId: string, inning: number): Promise<void> {
-  await requireCoach();
+  const user = await requireCoach();
   const game = await loadGame(gameId);
   if (!game) return;
   const clamped = Math.max(1, Math.min(9, Math.round(inning)));
@@ -231,6 +357,7 @@ export async function setInning(gameId: string, inning: number): Promise<void> {
           inning: clamped,
           playerId: a.playerId,
           position: a.position,
+          updatedBy: initialsOf(user.displayName),
         })),
       );
     }
@@ -240,6 +367,14 @@ export async function setInning(gameId: string, inning: number): Promise<void> {
     .update(tables.liveGames)
     .set({ currentInning: clamped, outs: 0 })
     .where(eq(tables.liveGames.id, gameId));
+  // The inning is shared state — stepping it turns every screen's page.
+  await logGameEdit({
+    gameId,
+    section: "game",
+    summary: `turned to inning ${clamped}`,
+    user,
+    coalesceKey: "inning",
+  });
   revalidatePath(`/game/${gameId}`);
 }
 
@@ -268,6 +403,7 @@ async function solveInningsRange(
   pinnedP: (inning: number) => string | null,
   sat: Record<string, number>,
   mode: LineupMode,
+  actor: string | null,
 ): Promise<void> {
   const db = await getDb();
   const pool = new Set(playerIds);
@@ -338,7 +474,7 @@ async function solveInningsRange(
         );
       await db
         .insert(tables.gameAssignments)
-        .values({ gameId: game.id, inning, playerId: pid, position });
+        .values({ gameId: game.id, inning, playerId: pid, position, updatedBy: actor });
       if (position === BENCH || position === "P") sat[pid] += 1;
     }
   }
@@ -355,7 +491,7 @@ export async function planFullGame(
   pitchers: (string | null)[],
   mode: LineupMode = "compete",
 ): Promise<{ ok: boolean }> {
-  await requireCoach();
+  const user = await requireCoach();
   const db = await getDb();
   const [game] = await db
     .select()
@@ -371,6 +507,7 @@ export async function planFullGame(
   const playerIds = [...new Set(assignmentRows.map((r) => r.playerId))];
   if (playerIds.length === 0) return { ok: false };
 
+  const actor = initialsOf(user.displayName);
   const sat: Record<string, number> = {};
   for (const pid of playerIds) sat[pid] = 0;
   await solveInningsRange(
@@ -381,7 +518,17 @@ export async function planFullGame(
     (inning) => pitchers[inning - 1] ?? null,
     sat,
     mode,
+    actor,
   );
+  await healDoubleBookings(gameId, 1, actor);
+  await logGameEdit({
+    gameId,
+    section: "plan",
+    summary: `planned all ${game.innings} innings around the declared arms (${
+      mode === "develop" ? "up big" : "close game"
+    })`,
+    user,
+  });
   revalidatePath(`/game/${gameId}`);
   return { ok: true };
 }
@@ -395,7 +542,7 @@ export async function addPlayerToGame(
   gameId: string,
   playerId: string,
 ): Promise<{ ok: boolean }> {
-  await requireCoach();
+  const user = await requireCoach();
   const db = await getDb();
   const [game] = await db
     .select()
@@ -420,7 +567,13 @@ export async function addPlayerToGame(
   for (let inning = 1; inning <= game.innings; inning++) {
     await db
       .insert(tables.gameAssignments)
-      .values({ gameId, inning, playerId, position: BENCH });
+      .values({
+        gameId,
+        inning,
+        playerId,
+        position: BENCH,
+        updatedBy: initialsOf(user.displayName),
+      });
   }
   const orderRows = await db
     .select()
@@ -430,6 +583,12 @@ export async function addPlayerToGame(
   await db
     .insert(tables.battingOrders)
     .values({ gameId, playerId, spot: nextSpot });
+  await logGameEdit({
+    gameId,
+    section: "field",
+    summary: `added ${await shortNameOf(playerId)} to the game`,
+    user,
+  });
   revalidatePath(`/game/${gameId}`);
   return { ok: true };
 }
@@ -500,34 +659,41 @@ export async function addPitches(
   playerId: string,
   delta: number,
 ): Promise<void> {
-  await requireCoach();
+  const user = await requireCoach();
   const game = await loadGame(gameId);
   if (!game) return;
   const db = await getDb();
-  const [existing] = await db
-    .select()
-    .from(tables.pitchCounts)
-    .where(
-      and(
-        eq(tables.pitchCounts.gameId, gameId),
-        eq(tables.pitchCounts.playerId, playerId),
-        eq(tables.pitchCounts.inning, game.currentInning),
-      ),
-    )
-    .limit(1);
-  if (existing) {
-    await db
-      .update(tables.pitchCounts)
-      .set({ pitches: Math.max(0, existing.pitches + delta), updatedAt: new Date() })
-      .where(eq(tables.pitchCounts.id, existing.id));
-  } else if (delta > 0) {
-    await db.insert(tables.pitchCounts).values({
+  // One atomic statement, not read-then-write: when two coaches tap at
+  // the same moment, both taps count — the database adds, we don't.
+  const [row] = await db
+    .insert(tables.pitchCounts)
+    .values({
       gameId,
       playerId,
       inning: game.currentInning,
-      pitches: delta,
-    });
-  }
+      pitches: Math.max(0, delta),
+    })
+    .onConflictDoUpdate({
+      target: [
+        tables.pitchCounts.gameId,
+        tables.pitchCounts.playerId,
+        tables.pitchCounts.inning,
+      ],
+      set: {
+        pitches: sql`GREATEST(0, ${tables.pitchCounts.pitches} + ${delta})`,
+        updatedAt: new Date(),
+      },
+    })
+    .returning({ pitches: tables.pitchCounts.pitches });
+  await logGameEdit({
+    gameId,
+    section: "pitches",
+    summary: `pitch count: ${await shortNameOf(playerId)} at ${
+      row?.pitches ?? "?"
+    } in inning ${game.currentInning}`,
+    user,
+    coalesceKey: `pitches:${playerId}:${game.currentInning}`,
+  });
   revalidatePath(`/game/${gameId}`);
 }
 
@@ -560,7 +726,7 @@ export async function moveGamePlayer(
   target: Slot,
   force = false,
 ): Promise<MoveResult> {
-  await requireCoach();
+  const user = await requireCoach();
   const game = await loadGame(gameId);
   if (!game) return { ok: false, warning: "Game not found." };
 
@@ -592,6 +758,7 @@ export async function moveGamePlayer(
   const current = new Map(rows.map((r) => [r.playerId, r.position]));
   if (!current.has(playerId)) return { ok: false, warning: "Player not in this game." };
 
+  const actor = initialsOf(user.displayName);
   const plan = planMove(current, playerId, target, game.currentInning, game.innings);
   for (const s of plan.set) {
     const [existing] = await db
@@ -608,7 +775,7 @@ export async function moveGamePlayer(
     if (existing) {
       await db
         .update(tables.gameAssignments)
-        .set({ position: s.position })
+        .set({ position: s.position, updatedBy: actor, updatedAt: new Date() })
         .where(eq(tables.gameAssignments.id, existing.id));
     } else {
       await db.insert(tables.gameAssignments).values({
@@ -616,9 +783,23 @@ export async function moveGamePlayer(
         inning: s.inning,
         playerId: s.playerId,
         position: s.position,
+        updatedBy: actor,
       });
     }
   }
+  // If another screen's move crossed with this one, resolve any
+  // double-booked slot now — newest write keeps it, visibly.
+  const healed = await healDoubleBookings(gameId, game.currentInning, actor);
+  await logGameEdit({
+    gameId,
+    section: "field",
+    summary:
+      `moved ${await shortNameOf(playerId)} to ${target === BENCH ? "the bench" : target}` +
+      (healed.length > 0
+        ? ` · auto-benched ${healed.join(", ")} (double-booked at that spot)`
+        : ""),
+    user,
+  });
   revalidatePath(`/game/${gameId}`);
   return { ok: true, warning: null };
 }
@@ -628,7 +809,7 @@ export async function swapBattingSpot(
   playerId: string,
   direction: "up" | "down",
 ): Promise<void> {
-  await requireCoach();
+  const user = await requireCoach();
   const db = await getDb();
   const order = await db
     .select()
@@ -649,6 +830,31 @@ export async function swapBattingSpot(
     .update(tables.battingOrders)
     .set({ spot: a.spot })
     .where(eq(tables.battingOrders.id, b.id));
+  // Arrow taps from two screens can cross and leave duplicate spots.
+  // Renumber 1..n deterministically so every device converges on one
+  // valid order (each write ends with this sweep — the last one wins).
+  const after = await db
+    .select()
+    .from(tables.battingOrders)
+    .where(eq(tables.battingOrders.gameId, gameId));
+  const normalized = after.sort(
+    (x, y) => x.spot - y.spot || x.playerId.localeCompare(y.playerId),
+  );
+  for (let i = 0; i < normalized.length; i++) {
+    if (normalized[i].spot !== i + 1) {
+      await db
+        .update(tables.battingOrders)
+        .set({ spot: i + 1 })
+        .where(eq(tables.battingOrders.id, normalized[i].id));
+    }
+  }
+  await logGameEdit({
+    gameId,
+    section: "order",
+    summary: `moved ${await shortNameOf(playerId)} ${direction} in the batting order`,
+    user,
+    coalesceKey: "order",
+  });
   revalidatePath(`/game/${gameId}`);
 }
 
@@ -665,7 +871,7 @@ export async function autoArrangeField(
   gameId: string,
   mode: LineupMode = "compete",
 ): Promise<{ ok: boolean }> {
-  await requireCoach();
+  const user = await requireCoach();
   const db = await getDb();
   const [game] = await db
     .select()
@@ -701,6 +907,7 @@ export async function autoArrangeField(
     }
   }
 
+  const actor = initialsOf(user.displayName);
   await solveInningsRange(
     game,
     playerIds,
@@ -709,7 +916,17 @@ export async function autoArrangeField(
     (inning) => pitcherByInning[inning] ?? null,
     sat,
     mode,
+    actor,
   );
+  await healDoubleBookings(gameId, game.currentInning, actor);
+  await logGameEdit({
+    gameId,
+    section: "plan",
+    summary: `auto-arranged innings ${game.currentInning}–${game.innings} (${
+      mode === "develop" ? "up big" : "close game"
+    })`,
+    user,
+  });
   revalidatePath(`/game/${gameId}`);
   return { ok: true };
 }
@@ -722,7 +939,7 @@ export async function autoArrangeField(
 export async function applySuggestedBattingOrder(
   gameId: string,
 ): Promise<{ ok: boolean; notes: string[] }> {
-  await requireCoach();
+  const user = await requireCoach();
   const db = await getDb();
   const [game] = await db
     .select()
@@ -806,6 +1023,12 @@ export async function applySuggestedBattingOrder(
         ),
       );
   }
+  await logGameEdit({
+    gameId,
+    section: "order",
+    summary: "applied a generated batting order",
+    user,
+  });
   revalidatePath(`/game/${gameId}`);
 
   const nameOf = new Map(players.map((p) => [p.id, `${p.firstName} ${p.lastName.charAt(0)}.`]));
@@ -825,6 +1048,7 @@ export async function removeGame(formData: FormData): Promise<void> {
     tables.battingOrders,
     tables.scoreLines,
     tables.pitchCounts,
+    tables.gameEdits,
   ]) {
     await db.delete(table).where(eq(table.gameId, gameId));
   }
@@ -838,7 +1062,7 @@ export async function gameSnapshot(gameId: string) {
   const game = await loadGame(gameId);
   if (!game) return null;
   const db = await getDb();
-  const [assignmentRows, orderRows, scoreRows, pitchRows] = await Promise.all([
+  const [assignmentRows, orderRows, scoreRows, pitchRows, editRows] = await Promise.all([
     db
       .select()
       .from(tables.gameAssignments)
@@ -849,6 +1073,12 @@ export async function gameSnapshot(gameId: string) {
       .where(eq(tables.battingOrders.gameId, gameId)),
     db.select().from(tables.scoreLines).where(eq(tables.scoreLines.gameId, gameId)),
     db.select().from(tables.pitchCounts).where(eq(tables.pitchCounts.gameId, gameId)),
+    db
+      .select()
+      .from(tables.gameEdits)
+      .where(eq(tables.gameEdits.gameId, gameId))
+      .orderBy(desc(tables.gameEdits.at))
+      .limit(12),
   ]);
   const playerIds = [...new Set(assignmentRows.map((r) => r.playerId))];
   const players = playerIds.length
@@ -893,5 +1123,13 @@ export async function gameSnapshot(gameId: string) {
     players,
     eligibility,
     ratingsByPlayer,
+    // The shared-editing trail, newest first — who touched what, when.
+    recentEdits: editRows.map((e) => ({
+      id: e.id,
+      section: e.section,
+      summary: e.summary,
+      actor: e.actor,
+      atMs: e.at.getTime(),
+    })),
   };
 }

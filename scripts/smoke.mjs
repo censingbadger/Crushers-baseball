@@ -287,12 +287,22 @@ await page.waitForTimeout(600);
 const liveText = await page.textContent("main");
 if (!liveText?.includes("5 pitches")) fail("pitch count did not update");
 
+// Shared-editing trail: with several coaches in the same dugout, the
+// strip names who just changed what (signed in as Coach Demo → "You").
+const editTrail = await page.textContent("[data-testid=edit-log]");
+if (!editTrail?.includes("You")) fail("edit trail missing the actor");
+if (!editTrail?.toLowerCase().includes("pitch count"))
+  fail("edit trail missing the pitch-count entry");
+
 // ⚡ Auto-arrange (the Lineup lab, absorbed): field stays fully staffed.
 page.once("dialog", (d) => d.accept());
 await page.click("button:has-text('Auto-arrange')");
 await page.waitForTimeout(1000);
 const afterArrange = await page.locator("button:has-text('—')").count();
 if (afterArrange > 0) fail("auto-arrange left slots empty");
+const trailAfterArrange = await page.textContent("[data-testid=edit-log]");
+if (!trailAfterArrange?.toLowerCase().includes("auto-arranged"))
+  fail("edit trail missing the auto-arrange entry");
 
 // Dugout board: the player-safe view — no suggestions, no pitch numbers.
 await page.click("button:has-text('Dugout board')");
@@ -301,6 +311,7 @@ const boardText = await page.textContent("main");
 if (boardText?.includes("Coach's assist")) fail("board mode shows suggestions");
 if (boardText?.includes("left today")) fail("board mode shows pitch numbers");
 if (boardText?.includes("Up big")) fail("board mode shows the mode toggle");
+if (boardText?.includes("✎")) fail("board mode shows the edit trail");
 if (!boardText?.includes("Batting order")) fail("board mode missing batting order");
 await page.screenshot({ path: `${SHOTS}/10b-board.png`, fullPage: true });
 await page.click("button:has-text('Coach view')");
@@ -389,6 +400,10 @@ await page.screenshot({ path: `${SHOTS}/10-dugout.png`, fullPage: true });
 
 // Drag & drop: pull the catcher to the bench with the mouse; the assist
 // island must flag the hole and its best suggestion must refill it.
+// Raw mouse coordinates don't auto-scroll like locator clicks do — pin
+// the scroll first so no chip hides under the sticky header.
+await page.evaluate(() => window.scrollTo(0, 0));
+await page.waitForTimeout(300);
 const cChip = page.locator("button:has(span:text-is('C'))").first();
 const cBox = await cChip.boundingBox();
 const bBox = await page.locator("[data-drop='BENCH']").boundingBox();

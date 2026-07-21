@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BENCH,
   benchInnings,
+  duplicateOccupants,
   emptyPositions,
   fieldInnings,
   planMove,
@@ -71,5 +72,54 @@ describe("emptyPositions", () => {
     expect(empty).toContain("1B");
     expect(empty).not.toContain("C");
     expect(empty).toHaveLength(8);
+  });
+});
+
+describe("duplicateOccupants", () => {
+  it("returns nothing for a clean inning", () => {
+    expect(
+      duplicateOccupants([
+        { playerId: "a", position: "SS", updatedAtMs: 100 },
+        { playerId: "b", position: "C", updatedAtMs: 200 },
+        { playerId: "c", position: BENCH, updatedAtMs: 300 },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("benches the older write when two coaches land on one slot", () => {
+    expect(
+      duplicateOccupants([
+        { playerId: "old", position: "SS", updatedAtMs: 100 },
+        { playerId: "new", position: "SS", updatedAtMs: 200 },
+      ]),
+    ).toEqual(["old"]);
+  });
+
+  it("keeps exactly one player per slot with three-way pileups", () => {
+    const losers = duplicateOccupants([
+      { playerId: "a", position: "1B", updatedAtMs: 100 },
+      { playerId: "b", position: "1B", updatedAtMs: 300 },
+      { playerId: "c", position: "1B", updatedAtMs: 200 },
+    ]);
+    expect(losers.sort()).toEqual(["a", "c"]);
+  });
+
+  it("breaks timestamp ties deterministically (by playerId)", () => {
+    expect(
+      duplicateOccupants([
+        { playerId: "zed", position: "CF", updatedAtMs: 100 },
+        { playerId: "amy", position: "CF", updatedAtMs: 100 },
+      ]),
+    ).toEqual(["zed"]);
+  });
+
+  it("never dedupes the bench — any number can sit", () => {
+    expect(
+      duplicateOccupants([
+        { playerId: "a", position: BENCH, updatedAtMs: 100 },
+        { playerId: "b", position: BENCH, updatedAtMs: 100 },
+        { playerId: "c", position: BENCH, updatedAtMs: 100 },
+      ]),
+    ).toEqual([]);
   });
 });

@@ -4,6 +4,7 @@ import { getDb, tables } from "@/db";
 import { requireCoach } from "@/lib/auth";
 import { getPositionRoles, getRoster } from "@/lib/data";
 import { aspiringTokens, rolesByPlayerFrom } from "@/lib/depth";
+import { initialsOf } from "@/lib/format";
 import { benchInnings } from "@/lib/gameday";
 import { computeSeasonUsage } from "@/lib/usage";
 import { gameSnapshot } from "@/app/game/actions";
@@ -14,7 +15,7 @@ export default async function GamePage({
 }: {
   params: Promise<{ gameId: string }>;
 }) {
-  await requireCoach();
+  const user = await requireCoach();
   const { gameId } = await params;
   const snap = await gameSnapshot(gameId);
   if (!snap) notFound();
@@ -131,6 +132,8 @@ export default async function GamePage({
         addablePlayers={addablePlayers}
         score={scoreRows.map((s) => ({ inning: s.inning, side: s.side, runs: s.runs }))}
         battingOrder={orderRows.map((o) => ({ playerId: o.playerId, spot: o.spot }))}
+        recentEdits={snap.recentEdits}
+        myInitials={initialsOf(user.displayName)}
       />
     </div>
   );

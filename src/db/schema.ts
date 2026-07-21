@@ -393,7 +393,10 @@ export const liveGames = pgTable("live_games", {
 
 // Where each player is, per inning. position is a fielding position or
 // "BENCH". A move in inning N rewrites innings N..end, so bench/played
-// innings fall straight out of this table.
+// innings fall straight out of this table. updatedBy/updatedAt say whose
+// write a row is — several coaches run the same dugout at once, and when
+// two of them land players on the same slot, the newest write keeps it
+// (the double-booking heal in the game actions).
 export const gameAssignments = pgTable(
   "game_assignments",
   {
@@ -406,8 +409,35 @@ export const gameAssignments = pgTable(
       .notNull()
       .references(() => players.id),
     position: text("position").notNull(), // Position | "BENCH"
+    updatedBy: text("updated_by"), // coach initials; null = solver seed
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("assignment_once").on(t.gameId, t.inning, t.playerId)],
+);
+
+// The dugout's shared-editing trail: who touched the live game, and when.
+// Three coaches can have the same game open on three devices; every
+// meaningful write logs here so the other screens can show "MC · moved
+// Jax T. to SS · 12s ago" instead of silently morphing. Append-mostly:
+// rapid same-coach bursts (pitch taps, order arrows, inning steps) fold
+// into their latest row via coalesceKey so the feed stays readable.
+export type GameEditSection = "field" | "order" | "pitches" | "plan" | "game";
+
+export const gameEdits = pgTable(
+  "game_edits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => liveGames.id),
+    section: text("section").$type<GameEditSection>().notNull(),
+    summary: text("summary").notNull(),
+    actor: text("actor").notNull(), // coach initials — same label as ratings
+    createdByUserId: uuid("created_by_user_id").references(() => users.id),
+    coalesceKey: text("coalesce_key"),
+    at: timestamp("at").notNull().defaultNow(),
+  },
+  (t) => [index("game_edits_game").on(t.gameId)],
 );
 
 export const battingOrders = pgTable(
