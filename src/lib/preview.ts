@@ -3,7 +3,10 @@
 // and working, deliberately not in use. Everything listed here stays fully
 // functional for demos and flips on by editing this one file.
 
+// Players leads this list on purpose: the kids' own pages are the most
+// likely V2 next step (Mike, 2026-07-21), so they sit first in the menu.
 export const FUTURE_PREVIEW_LINKS = [
+  { href: "/players", label: "Players" },
   { href: "/weekend", label: "Weekend" },
   { href: "/practice", label: "Practice stations" },
   { href: "/drills", label: "Drills" },
@@ -11,7 +14,6 @@ export const FUTURE_PREVIEW_LINKS = [
   { href: "/import", label: "Import" },
   { href: "/schedule", label: "Schedule" },
   { href: "/availability", label: "Availability" },
-  { href: "/players", label: "Players" },
   { href: "/progress", label: "Progress" },
 ];
 

@@ -44,6 +44,14 @@ const headerText = await page.textContent("header");
 if (headerText?.includes("Planning")) fail("coach nav still shows Planning group");
 if (headerText?.includes("Admin")) fail("coach nav still shows Admin group");
 if (!headerText?.includes("Performance")) fail("coach nav missing Performance group");
+// Homework sits under Performance; Players leads Future preview (the
+// likeliest V2 next step comes first).
+const navHrefs = await page
+  .locator("header nav a")
+  .evaluateAll((as) => as.map((a) => a.getAttribute("href")));
+if (!navHrefs.includes("/homework")) fail("Homework missing from the coach nav");
+if (navHrefs.indexOf("/players") > navHrefs.indexOf("/weekend"))
+  fail("Players is not first in Future preview");
 
 // Coach home is the four-needs launcher — no schedule hero, no parked links.
 const homeText = await page.textContent("main");
@@ -226,6 +234,43 @@ await page
   .locator("[data-player-row='Eli Brooks'] button[data-level='0']")
   .click();
 await page.waitForTimeout(700);
+
+// Homework: feedback gaps become researched at-home drills, aligned to
+// the BARS dimensions — the self-regulation cluster included. The demo
+// seed rates Eli below standard on Fielding (D3) and Focus (D8).
+await page.goto(BASE + "/homework");
+const hwText = await page.textContent("main");
+if (!hwText?.includes("between-practice work")) fail("homework page incomplete");
+const eliCard = page.locator("[data-hw-player='Eli Brooks']");
+const eliChips = await eliCard.locator("summary").first().textContent();
+if (!eliChips?.includes("Focus")) fail("Eli's Focus (D8) gap chip missing");
+if (!eliChips?.includes("Fielding")) fail("Eli's Fielding (D3) gap chip missing");
+await eliCard.locator("summary").first().click();
+await page.waitForTimeout(300);
+const eliBody = await eliCard.textContent();
+if (!eliBody?.includes("Working toward:")) fail("gap card missing the next-level target");
+// Open the first suggested drill: instructions, cue, source, then assign.
+const firstDrill = eliCard.locator("[data-drill]").first();
+await firstDrill.locator("summary").click();
+await page.waitForTimeout(200);
+const drillText = await firstDrill.textContent();
+if (!drillText?.includes("The one thought")) fail("drill card missing its cue");
+if (!drillText?.includes("Source:")) fail("drill card missing its source");
+await firstDrill.locator("button:has-text('Assign as homework')").click();
+await page.waitForTimeout(1000);
+const afterAssign = await page
+  .locator("[data-hw-player='Eli Brooks'] summary")
+  .first()
+  .textContent();
+if (!afterAssign?.includes("1 assigned")) fail("homework assignment did not stick");
+// Check it off, coach-style, at the next practice.
+await page
+  .locator("[data-hw-player='Eli Brooks'] button:has-text('Done')")
+  .first()
+  .click();
+await page.waitForTimeout(900);
+const afterDone = await page.locator("[data-hw-player='Eli Brooks']").textContent();
+if (!afterDone?.includes("Reopen")) fail("homework done-toggle did not stick");
 
 // Aspirations and development notes on Milo's player page.
 await page.goto(BASE + "/roster");

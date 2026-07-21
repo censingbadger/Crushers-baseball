@@ -1,0 +1,311 @@
+import Link from "next/link";
+import { desc, eq } from "drizzle-orm";
+import { getDb, tables } from "@/db";
+import { requireCoach } from "@/lib/auth";
+import { getPositionRoles, getRoster } from "@/lib/data";
+import { BARS_BY_KEY, barsSummary, type BarsKey } from "@/lib/bars";
+import {
+  HOMEWORK_CATALOG,
+  drillByKey,
+  drillsFor,
+  playerGaps,
+  type HomeworkDrill,
+} from "@/lib/homework";
+import { DrillDiagram } from "@/components/DrillDiagram";
+import { formatEventDate } from "@/lib/format";
+import { assignHomework, removeHomework, toggleHomework } from "./actions";
+
+// Homework: the feedback loop's second half. The BARS medians say where
+// each kid stands against the 11U standard; this page turns the gaps —
+// skills AND the self-regulation cluster (focus, response to failure,
+// coachability) — into researched, sourced drills a family can run at
+// home, and tracks what's been assigned. Roster order, no ranking.
+
+function DrillCard({
+  drill,
+  seasonId,
+  playerId,
+}: {
+  drill: HomeworkDrill;
+  seasonId: string;
+  playerId: string;
+}) {
+  return (
+    <details className="rounded-lg border border-line bg-paper p-2" data-drill={drill.key}>
+      <summary className="cursor-pointer text-sm font-bold">
+        {drill.staple ? "★ " : ""}
+        {drill.title}
+        <span className="ml-1.5 text-xs font-semibold text-neutral-500">
+          {drill.minutes} min · {drill.partner ? "needs a partner" : "solo"}
+        </span>
+      </summary>
+      <div className="mt-2 space-y-2 text-sm">
+        <p className="font-semibold text-neutral-700">{drill.fixes}</p>
+        <p className="rounded bg-team-blue-light/60 px-2 py-1.5 font-bold">
+          🗣 The one thought: “{drill.cue}”
+        </p>
+        <ol className="list-decimal space-y-1 pl-5">
+          {drill.steps.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ol>
+        <p className="text-xs font-semibold text-neutral-600">
+          <b>How much:</b> {drill.reps} · <b>Gear:</b> {drill.equipment}
+        </p>
+        {drill.safety && (
+          <p className="rounded border border-amber-600 bg-amber-50 px-2 py-1.5 text-xs font-semibold">
+            ⚠ {drill.safety}
+          </p>
+        )}
+        {drill.diagram && <DrillDiagram kind={drill.diagram} />}
+        <p className="text-xs text-neutral-500">
+          Source:{" "}
+          <a className="underline" href={drill.source.url} target="_blank" rel="noreferrer">
+            {drill.source.name}
+          </a>
+        </p>
+        <form action={assignHomework}>
+          <input type="hidden" name="seasonId" value={seasonId} />
+          <input type="hidden" name="playerId" value={playerId} />
+          <input type="hidden" name="drillKey" value={drill.key} />
+          <button className="btn btn-primary px-3 py-1.5 text-xs" type="submit">
+            ＋ Assign as homework
+          </button>
+        </form>
+      </div>
+    </details>
+  );
+}
+
+export default async function HomeworkPage() {
+  await requireCoach();
+  const db = await getDb();
+  const [season] = await db
+    .select()
+    .from(tables.seasons)
+    .where(eq(tables.seasons.isActive, true))
+    .limit(1);
+  if (!season) {
+    return <p className="card p-4">No active season yet — set one up first.</p>;
+  }
+
+  const [roster, roleRows, barsRows, assignments] = await Promise.all([
+    getRoster(season.id),
+    getPositionRoles(season.id),
+    db.select().from(tables.barsRatings).where(eq(tables.barsRatings.seasonId, season.id)),
+    db
+      .select()
+      .from(tables.homeworkAssignments)
+      .where(eq(tables.homeworkAssignments.seasonId, season.id))
+      .orderBy(desc(tables.homeworkAssignments.createdAt)),
+  ]);
+  const summary = barsSummary(barsRows);
+
+  // Role modules count only for kids who actually fill the role.
+  const roleFlags = new Map<string, { pitcher: boolean; catcher: boolean }>();
+  for (const r of roleRows) {
+    if (!["primary", "secondary", "develop"].includes(r.role)) continue;
+    const f = roleFlags.get(r.playerId) ?? { pitcher: false, catcher: false };
+    if (r.position === "P") f.pitcher = true;
+    if (r.position === "C") f.catcher = true;
+    roleFlags.set(r.playerId, f);
+  }
+  const byPlayer = new Map<string, typeof assignments>();
+  for (const a of assignments) {
+    const list = byPlayer.get(a.playerId) ?? [];
+    list.push(a);
+    byPlayer.set(a.playerId, list);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <h1 className="text-xl font-extrabold">Homework</h1>
+        <p className="mt-1 max-w-3xl text-sm text-neutral-700">
+          Player feedback turned into between-practice work. Each kid&apos;s
+          lowest observed levels — skills and the self-regulation dimensions
+          alike — come with researched drills a family can run at home, most
+          with nothing more than a glove, a ball, and a wall. Assign what
+          fits, check it off at the next practice. Feedback lives in{" "}
+          <Link className="underline" href="/rate">
+            Player feedback
+          </Link>
+          ; an unrated player has no gaps to work from yet.
+        </p>
+      </div>
+
+      {roster.map((p) => {
+        const gaps = playerGaps(summary.get(p.playerId), roleFlags.get(p.playerId));
+        const mine = byPlayer.get(p.playerId) ?? [];
+        const open = mine.filter((a) => a.status === "assigned");
+        const name = `${p.firstName} ${p.lastName}`;
+        return (
+          <details key={p.playerId} className="card p-0" data-hw-player={name}>
+            <summary className="flex cursor-pointer flex-wrap items-center gap-2 p-3">
+              <span className="font-extrabold">
+                {p.jerseyNumber !== null && (
+                  <span className="mr-1.5 text-neutral-500">#{p.jerseyNumber}</span>
+                )}
+                {name}
+              </span>
+              {gaps.map((g) => (
+                <span
+                  key={g.dimension}
+                  className={`chip ${
+                    g.kind === "below"
+                      ? "border border-amber-600 bg-amber-100"
+                      : "bg-team-blue-light"
+                  }`}
+                  title={
+                    g.kind === "below"
+                      ? "Below the 11U standard — homework target"
+                      : "At standard — sharpening target"
+                  }
+                >
+                  {BARS_BY_KEY[g.dimension].label} {g.median}
+                  {g.flagged ? " ⚠" : ""}
+                </span>
+              ))}
+              {gaps.length === 0 && (
+                <span className="chip bg-paper text-neutral-500">not rated yet</span>
+              )}
+              {open.length > 0 && (
+                <span className="chip bg-team-orange text-paper">
+                  {open.length} assigned
+                </span>
+              )}
+            </summary>
+            <div className="space-y-3 border-t border-line p-3">
+              {gaps.map((g) => (
+                <section key={g.dimension}>
+                  <h3 className="text-sm font-extrabold">
+                    {BARS_BY_KEY[g.dimension].label}
+                    <span className="ml-1.5 text-xs font-bold text-neutral-500">
+                      median {g.median}
+                      {g.kind === "below" ? " · below the 11U standard" : " · level up"}
+                    </span>
+                    {g.flagged && (
+                      <span className="ml-1.5 text-xs font-bold text-amber-700">
+                        raters split — compare notes first
+                      </span>
+                    )}
+                  </h3>
+                  <p className="mt-0.5 text-xs font-semibold text-neutral-600">
+                    Working toward: {g.target}
+                  </p>
+                  <div className="mt-1.5 space-y-1.5">
+                    {drillsFor(g.dimension).map((d) => (
+                      <DrillCard
+                        key={d.key}
+                        drill={d}
+                        seasonId={season.id}
+                        playerId={p.playerId}
+                      />
+                    ))}
+                    {drillsFor(g.dimension).length === 0 && (
+                      <p className="text-xs text-neutral-500">
+                        No catalog drills for this dimension yet.
+                      </p>
+                    )}
+                  </div>
+                </section>
+              ))}
+              {gaps.length === 0 && (
+                <p className="text-sm text-neutral-600">
+                  No observed feedback yet —{" "}
+                  <Link className="underline" href="/rate">
+                    rate him first
+                  </Link>{" "}
+                  and the gaps appear here, or assign straight from the full
+                  list below.
+                </p>
+              )}
+
+              <details className="rounded-lg border border-dashed border-line-strong p-2">
+                <summary className="cursor-pointer text-xs font-bold uppercase text-neutral-600">
+                  Assign from the full drill list
+                </summary>
+                <form action={assignHomework} className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <input type="hidden" name="seasonId" value={season.id} />
+                  <input type="hidden" name="playerId" value={p.playerId} />
+                  <select
+                    name="drillKey"
+                    className="min-w-0 flex-1 rounded border border-line px-2 py-1.5 text-sm"
+                  >
+                    {HOMEWORK_CATALOG.map((d) => (
+                      <option key={d.key} value={d.key}>
+                        {BARS_BY_KEY[d.dimension].label} — {d.title}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="btn px-3 py-1.5 text-xs" type="submit">
+                    Assign
+                  </button>
+                </form>
+              </details>
+
+              {mine.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold uppercase text-neutral-600">
+                    Assigned homework
+                  </h4>
+                  <ul className="mt-1 space-y-1">
+                    {mine.map((a) => {
+                      const drill = drillByKey(a.drillKey);
+                      return (
+                        <li
+                          key={a.id}
+                          className="flex flex-wrap items-center gap-1.5 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm"
+                        >
+                          <span
+                            className={`font-bold ${
+                              a.status === "done" ? "text-neutral-400 line-through" : ""
+                            }`}
+                          >
+                            {drill?.title ?? a.drillKey}
+                          </span>
+                          <span className="chip bg-team-blue-light">
+                            {BARS_BY_KEY[a.dimension as BarsKey]?.label ?? a.dimension}
+                          </span>
+                          <span className="text-xs font-semibold text-neutral-500">
+                            {a.assignedBy} · {formatEventDate(a.createdAt)}
+                          </span>
+                          {a.note && (
+                            <span className="text-xs text-neutral-600">“{a.note}”</span>
+                          )}
+                          <span className="ml-auto flex items-center gap-1">
+                            <form action={toggleHomework}>
+                              <input type="hidden" name="id" value={a.id} />
+                              <button
+                                className={`btn px-2 py-1 text-xs ${
+                                  a.status === "done" ? "" : "btn-primary"
+                                }`}
+                                type="submit"
+                              >
+                                {a.status === "done" ? "↺ Reopen" : "✓ Done"}
+                              </button>
+                            </form>
+                            <form action={removeHomework}>
+                              <input type="hidden" name="id" value={a.id} />
+                              <button
+                                className="btn px-2 py-1 text-xs"
+                                type="submit"
+                                title="Remove"
+                              >
+                                ✕
+                              </button>
+                            </form>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </details>
+        );
+      })}
+    </div>
+  );
+}

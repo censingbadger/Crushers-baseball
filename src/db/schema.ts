@@ -625,6 +625,36 @@ export const reports = pgTable(
   (t) => [uniqueIndex("report_once").on(t.seasonId, t.playerId, t.month)],
 );
 
+// Homework: a feedback gap turned into between-practice work. Each row
+// assigns one catalog drill (the researched set in src/lib/homework.ts,
+// referenced by stable key) to one player, tied to the BARS dimension it
+// develops — so what we rate is what we practice. Coach-only in V1:
+// delivered verbally or printed at practice; "done" is the coach's tap
+// after checking in with the kid.
+export type HomeworkStatus = "assigned" | "done";
+
+export const homeworkAssignments = pgTable(
+  "homework_assignments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => seasons.id),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id),
+    dimension: text("dimension").$type<import("@/lib/bars").BarsKey>().notNull(),
+    drillKey: text("drill_key").notNull(),
+    note: text("note"),
+    status: text("status").$type<HomeworkStatus>().notNull().default("assigned"),
+    assignedBy: text("assigned_by").notNull(), // coach initials, as everywhere
+    createdByUserId: uuid("created_by_user_id").references(() => users.id),
+    completedAt: timestamp("completed_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("homework_season_player").on(t.seasonId, t.playerId)],
+);
+
 // Player pages (goal 12): each kid's own corner of the app, used through a
 // parent's login (no child accounts). Everything here is motivational —
 // avatars, personalization, effort logs. Coach ratings and evaluative
@@ -650,13 +680,16 @@ export const playerPages = pgTable("player_pages", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Coach-curated drill library feeding the guided workouts.
+// Coach-curated drill library feeding the guided workouts. "mental"
+// covers the self-regulation homework (focus, reset routines, practice
+// habits) — listed in the library, never auto-scheduled into workouts.
 export type DrillCategory =
   | "hitting"
   | "fielding"
   | "throwing"
   | "pitching"
   | "speed"
+  | "mental"
   | "fun";
 
 export const drills = pgTable("drills", {

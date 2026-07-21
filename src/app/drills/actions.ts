@@ -9,7 +9,15 @@ import { STARTER_DRILLS } from "@/lib/drills";
 
 const drillSchema = z.object({
   title: z.string().trim().min(1).max(120),
-  category: z.enum(["hitting", "fielding", "throwing", "pitching", "speed", "fun"]),
+  category: z.enum([
+    "hitting",
+    "fielding",
+    "throwing",
+    "pitching",
+    "speed",
+    "mental",
+    "fun",
+  ]),
   minutes: z.coerce.number().int().min(1).max(60),
   cue: z.string().trim().min(1).max(200),
   description: z.string().trim().max(600).optional(),

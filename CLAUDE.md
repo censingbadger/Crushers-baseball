@@ -84,6 +84,18 @@
   stays as history. Reports live under Performance, pull BARS + anchors
   + next-level targets + GC stats + playing time, and always include
   the scale explanation (`BARS_SCALE_EXPLANATION`).
+- **Homework (`/homework`, `src/lib/homework.ts`)**: under Performance —
+  feedback's second half. The researched drill catalog lives in code
+  (`HOMEWORK_CATALOG`): every drill traces to a named public source
+  (instructions rewritten in our own words, never copied), keyed per
+  BARS dimension, diagrams in `DrillDiagram.tsx`. Gaps = observed
+  medians < 3 (worst first; the self-regulation dims D6–D9 count like
+  any skill; P/C modules only for kids with a matching depth-chart
+  role; unrated dimensions are never gaps), rounded out with lowest-
+  observed "level-up" picks so every rated kid gets work. Assignments
+  (`homework_assignments`) reference drills by stable key — never
+  rename a shipped key. The /drills starter set derives from the
+  catalog. Player cards stay in roster order — no ranking, ever.
 - **Types over enums**: text columns typed with `$type<...>()` unions.
 - **Theme**: tokens in `src/app/globals.css` (`--color-team-*`); Columbia
   blue primary, orange accent, black borders. Exact shades pending the team

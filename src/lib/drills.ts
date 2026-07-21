@@ -1,8 +1,13 @@
 import type { DrillCategory } from "@/db/schema";
+import type { BarsKey } from "@/lib/bars";
+import { HOMEWORK_CATALOG } from "@/lib/homework";
 
-// The coach-curated starter set for the drill library — loadable from the
-// Drills page, then editable like any other drill. Cues are the one
-// thought to hold, shown big during guided workouts.
+// The starter set for the editable drill library — loadable from the
+// Drills page, then editable like any other drill. Since the homework
+// build it derives from the researched homework catalog (src/lib/
+// homework.ts), so the guided workouts draw from the same sourced drills
+// the homework tab assigns. Cues are the one thought to hold, shown big
+// during guided workouts.
 export interface StarterDrill {
   title: string;
   category: DrillCategory;
@@ -11,72 +16,27 @@ export interface StarterDrill {
   description: string;
 }
 
-export const STARTER_DRILLS: StarterDrill[] = [
-  {
-    title: "Long toss",
-    category: "throwing",
-    minutes: 10,
-    cue: "Hit the chest — every throw has a target",
-    description:
-      "Start close, stretch it out five steps at a time. Crow-hop, full arm circle, follow your throw.",
-  },
-  {
-    title: "Wall ball quick hands",
-    category: "fielding",
-    minutes: 8,
-    cue: "Quick glove to the dirt, chest over the ball",
-    description:
-      "Tennis ball against a wall: 20 forehands, 20 backhands, 10 short hops. Soft hands, feet always moving.",
-  },
-  {
-    title: "Tee work — middle of the field",
-    category: "hitting",
-    minutes: 10,
-    cue: "See the ball deep, drive it back up the middle",
-    description:
-      "25 swings off the tee aiming at an imaginary center fielder. Balance at the finish on every swing.",
-  },
-  {
-    title: "Dry swings with a focus word",
-    category: "hitting",
-    minutes: 5,
-    cue: "Load early, short stride, explode",
-    description:
-      "15 slow-motion swings feeling each phase, then 15 game-speed swings saying your focus word out loud.",
-  },
-  {
-    title: "Bullpen shadow work",
-    category: "pitching",
-    minutes: 8,
-    cue: "Breathe, balance point, then go",
-    description:
-      "No ball needed: 20 full deliveries in front of a mirror or shadow. Stick the balance point for a full second.",
-  },
-  {
-    title: "Target throws",
-    category: "pitching",
-    minutes: 10,
-    cue: "Small target, smooth tempo",
-    description:
-      "Pick a strike-zone-size target on a wall or net. 30 throws at game tempo, reset fully between each.",
-  },
-  {
-    title: "Sprint ladder",
-    category: "speed",
-    minutes: 6,
-    cue: "First three steps win the base",
-    description:
-      "Home-to-first sprints: 6 at 80%, 4 at full speed. Focus on the burst, run through the bag every time.",
-  },
-  {
-    title: "Backyard home run derby",
-    category: "fun",
-    minutes: 8,
-    cue: "Have a blast — swing free",
-    description:
-      "Wiffle balls, imaginary stadium, call your shots. Baseball is supposed to be fun.",
-  },
-];
+const CATEGORY_BY_DIMENSION: Record<BarsKey, DrillCategory> = {
+  d1: "hitting",
+  d2: "throwing",
+  d3: "fielding",
+  d4: "speed",
+  d5: "mental",
+  d6: "mental",
+  d7: "mental",
+  d8: "mental",
+  d9: "fun",
+  pitching: "pitching",
+  catching: "fielding",
+};
+
+export const STARTER_DRILLS: StarterDrill[] = HOMEWORK_CATALOG.map((d) => ({
+  title: d.title,
+  category: CATEGORY_BY_DIMENSION[d.dimension],
+  minutes: d.minutes,
+  cue: d.cue,
+  description: `${d.fixes} (${d.reps}. Source: ${d.source.name}.)`.slice(0, 590),
+}));
 
 export interface WorkoutDrill {
   id?: string;
