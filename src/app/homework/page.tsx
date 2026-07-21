@@ -9,11 +9,20 @@ import {
   drillByKey,
   drillsFor,
   playerGaps,
+  teamGaps,
   type HomeworkDrill,
 } from "@/lib/homework";
 import { DrillDiagram } from "@/components/DrillDiagram";
 import { formatEventDate } from "@/lib/format";
-import { assignHomework, removeHomework, toggleHomework } from "./actions";
+import { HomeworkSearch } from "./Search";
+import {
+  assignDrillToTeam,
+  assignHomework,
+  autoAssignPlayer,
+  autoAssignTeam,
+  removeHomework,
+  toggleHomework,
+} from "./actions";
 
 // Homework: the feedback loop's second half. The BARS medians say where
 // each kid stands against the 11U standard; this page turns the gaps —
@@ -101,15 +110,24 @@ export default async function HomeworkPage() {
   ]);
   const summary = barsSummary(barsRows);
 
-  // Role modules count only for kids who actually fill the role.
+  // Role modules count only for kids who actually fill the role; the
+  // primary/secondary spots also steer which drills lead a suggestion
+  // (an outfielder's fielding gap starts with fly-ball work).
   const roleFlags = new Map<string, { pitcher: boolean; catcher: boolean }>();
+  const positionsByPlayer = new Map<string, string[]>();
   for (const r of roleRows) {
     if (!["primary", "secondary", "develop"].includes(r.role)) continue;
     const f = roleFlags.get(r.playerId) ?? { pitcher: false, catcher: false };
     if (r.position === "P") f.pitcher = true;
     if (r.position === "C") f.catcher = true;
     roleFlags.set(r.playerId, f);
+    if (r.role !== "develop") {
+      const list = positionsByPlayer.get(r.playerId) ?? [];
+      list.push(r.position);
+      positionsByPlayer.set(r.playerId, list);
+    }
   }
+  const focus = teamGaps(summary);
   const byPlayer = new Map<string, typeof assignments>();
   for (const a of assignments) {
     const list = byPlayer.get(a.playerId) ?? [];
@@ -119,23 +137,83 @@ export default async function HomeworkPage() {
 
   return (
     <div className="space-y-3">
-      <div>
-        <h1 className="text-xl font-extrabold">Homework</h1>
-        <p className="mt-1 max-w-3xl text-sm text-neutral-700">
-          Player feedback turned into between-practice work. Each kid&apos;s
-          lowest observed levels — skills and the self-regulation dimensions
-          alike — come with researched drills a family can run at home, most
-          with nothing more than a glove, a ball, and a wall. Assign what
-          fits, check it off at the next practice. Feedback lives in{" "}
-          <Link className="underline" href="/rate">
-            Player feedback
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-extrabold">Homework</h1>
+          <p className="mt-1 max-w-3xl text-sm text-neutral-700">
+            Player feedback turned into between-practice work. Each kid&apos;s
+            lowest observed levels — skills and the self-regulation dimensions
+            alike — come with researched drills a family can run at home, most
+            with nothing more than a glove, a ball, and a wall. Assign what
+            fits, check it off at the next practice. Feedback lives in{" "}
+            <Link className="underline" href="/rate">
+              Player feedback
+            </Link>
+            ; an unrated player has no gaps to work from yet.
+          </p>
+        </div>
+        <span className="flex items-center gap-2">
+          <form action={autoAssignTeam}>
+            <input type="hidden" name="seasonId" value={season.id} />
+            <button
+              className="btn btn-primary text-sm"
+              type="submit"
+              title="Every rated player gets his top gap's best-fitting drill — position-aware, duplicates skipped. Remove any you don't want."
+            >
+              ⚡ Auto-assign team
+            </button>
+          </form>
+          <Link className="btn text-sm" href="/homework/print">
+            🖨 Print handouts
           </Link>
-          ; an unrated player has no gaps to work from yet.
-        </p>
+        </span>
       </div>
+
+      {/* Where the TEAM is short: dimensions where several kids sit
+          below the standard — one drill can be this week's team theme. */}
+      {focus.length > 0 && (
+        <div className="card p-3" data-testid="team-focus">
+          <h2 className="text-xs font-bold uppercase text-neutral-600">
+            Team focus — shared gaps
+          </h2>
+          <div className="mt-1.5 space-y-2">
+            {focus.map((f) => (
+              <div key={f.dimension} className="flex flex-wrap items-center gap-1.5">
+                <span className="font-bold">{BARS_BY_KEY[f.dimension].label}</span>
+                <span className="text-xs font-semibold text-neutral-600">
+                  {f.below} of {f.rated} rated players below the 11U standard
+                </span>
+                {drillsFor(f.dimension, HOMEWORK_CATALOG, 2).map((d) => (
+                  <form key={d.key} action={assignDrillToTeam}>
+                    <input type="hidden" name="seasonId" value={season.id} />
+                    <input type="hidden" name="drillKey" value={d.key} />
+                    <button
+                      className="btn px-2 py-1 text-xs"
+                      type="submit"
+                      title={`${d.fixes} (${d.minutes} min · ${d.partner ? "partner" : "solo"})`}
+                    >
+                      {d.staple ? "★ " : ""}
+                      {d.title} → team
+                    </button>
+                  </form>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <HomeworkSearch
+        seasonId={season.id}
+        players={roster.map((p) => ({
+          id: p.playerId,
+          name: `${p.firstName} ${p.lastName}`,
+        }))}
+      />
 
       {roster.map((p) => {
         const gaps = playerGaps(summary.get(p.playerId), roleFlags.get(p.playerId));
+        const positions = positionsByPlayer.get(p.playerId) ?? [];
         const mine = byPlayer.get(p.playerId) ?? [];
         const open = mine.filter((a) => a.status === "assigned");
         const name = `${p.firstName} ${p.lastName}`;
@@ -176,6 +254,29 @@ export default async function HomeworkPage() {
               )}
             </summary>
             <div className="space-y-3 border-t border-line p-3">
+              {gaps.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <form action={autoAssignPlayer}>
+                    <input type="hidden" name="seasonId" value={season.id} />
+                    <input type="hidden" name="playerId" value={p.playerId} />
+                    <button
+                      className="btn btn-primary px-3 py-1.5 text-xs"
+                      type="submit"
+                      title="His top gaps get their best-fitting drills in one tap — position-aware, duplicates skipped."
+                    >
+                      ⚡ Auto-assign his suggestions
+                    </button>
+                  </form>
+                  {open.length > 0 && (
+                    <Link
+                      className="btn px-3 py-1.5 text-xs"
+                      href={`/homework/print?player=${p.playerId}`}
+                    >
+                      🖨 Print his sheet
+                    </Link>
+                  )}
+                </div>
+              )}
               {gaps.map((g) => (
                 <section key={g.dimension}>
                   <h3 className="text-sm font-extrabold">
@@ -194,7 +295,7 @@ export default async function HomeworkPage() {
                     Working toward: {g.target}
                   </p>
                   <div className="mt-1.5 space-y-1.5">
-                    {drillsFor(g.dimension).map((d) => (
+                    {drillsFor(g.dimension, HOMEWORK_CATALOG, 3, positions).map((d) => (
                       <DrillCard
                         key={d.key}
                         drill={d}

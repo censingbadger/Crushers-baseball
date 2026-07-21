@@ -94,8 +94,15 @@
   role; unrated dimensions are never gaps), rounded out with lowest-
   observed "level-up" picks so every rated kid gets work. Assignments
   (`homework_assignments`) reference drills by stable key — never
-  rename a shipped key. The /drills starter set derives from the
-  catalog. Player cards stay in roster order — no ranking, ever.
+  rename a shipped key. ⚡ auto-assign (per player + whole team) writes
+  each kid's top gap-matched drills, position-aware via depth-chart
+  primaries/secondaries (`suggestForPlayer`); the Team focus panel
+  aggregates shared gaps (counts only, ≥2 kids below standard) with
+  one-tap team themes; `searchCatalog` powers the find-a-drill box;
+  /homework/print renders per-player handouts with a 4-week practice
+  log (minutes + parent initials) — print CSS in globals.css. The
+  /drills starter set derives from the catalog. Player cards stay in
+  roster order — no ranking, ever.
 - **Types over enums**: text columns typed with `$type<...>()` unions.
 - **Theme**: tokens in `src/app/globals.css` (`--color-team-*`); Columbia
   blue primary, orange accent, black borders. Exact shades pending the team

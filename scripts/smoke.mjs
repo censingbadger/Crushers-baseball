@@ -272,6 +272,36 @@ await page.waitForTimeout(900);
 const afterDone = await page.locator("[data-hw-player='Eli Brooks']").textContent();
 if (!afterDone?.includes("Reopen")) fail("homework done-toggle did not stick");
 
+// Team focus: two seeded kids sit below standard on Throwing (D2), so
+// the shared-gap panel offers a one-tap team theme.
+const hwFull = await page.textContent("main");
+if (!hwFull?.includes("Team focus")) fail("team focus panel missing");
+if (!hwFull?.includes("below the 11U standard")) fail("team focus missing the head count");
+
+// Catalog search: skill/gap/goal words find sourced drills.
+await page.fill("#hw-q", "wall ball");
+await page.waitForTimeout(400);
+const searchText = await page.textContent("[data-testid=hw-search]");
+if (!searchText?.includes("Wall ball")) fail("catalog search found nothing for wall ball");
+
+// ⚡ Auto-assign team: every rated kid gets his top gap's drill in one tap.
+await page.click("button:has-text('Auto-assign team')");
+await page.waitForTimeout(1500);
+const jaxChips = await page
+  .locator("[data-hw-player='Jax Turner'] summary")
+  .first()
+  .textContent();
+if (!jaxChips?.includes("assigned")) fail("team auto-assign gave Jax nothing");
+
+// Printable handouts: one sheet per player, practice log included.
+await page.goto(BASE + "/homework/print");
+const printText = await page.textContent("main");
+if (!printText?.includes("Practice log")) fail("print page missing the practice log");
+if (!printText?.includes("Parent initials")) fail("practice log missing the initials column");
+if (!printText?.includes("Hold this thought")) fail("print sheet missing the drill cue");
+await page.screenshot({ path: `${SHOTS}/16-homework-print.png`, fullPage: true });
+await page.goto(BASE + "/homework");
+
 // Aspirations and development notes on Milo's player page.
 await page.goto(BASE + "/roster");
 await page.click("a:has-text('Milo Vance')");

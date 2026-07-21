@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { BarsCell, BarsKey } from "./bars";
-import { drillsFor, playerGaps, type HomeworkDrill } from "./homework";
+import {
+  drillsFor,
+  playerGaps,
+  searchCatalog,
+  suggestForPlayer,
+  teamGaps,
+  type HomeworkDrill,
+} from "./homework";
 
 const cell = (median: number, flagged = false): BarsCell => ({
   median,
@@ -138,5 +145,129 @@ describe("drillsFor", () => {
 
   it("respects the limit", () => {
     expect(drillsFor("d3", catalog, 1).map((d) => d.key)).toEqual(["a"]);
+  });
+});
+
+const drill = (
+  key: string,
+  dimension: BarsKey,
+  extra: Partial<HomeworkDrill> = {},
+): HomeworkDrill => ({
+  key,
+  title: key,
+  dimension,
+  minutes: 8,
+  equipment: "glove",
+  partner: false,
+  cue: "cue",
+  fixes: "fixes",
+  steps: ["step"],
+  reps: "3x",
+  source: { name: "s", url: "u" },
+  ...extra,
+});
+
+describe("position-aware ordering", () => {
+  const catalog = [
+    drill("infield", "d3", { positions: ["SS", "2B"] }),
+    drill("universal", "d3"),
+    drill("outfield", "d3", { positions: ["LF", "CF", "RF"] }),
+  ];
+
+  it("floats matching-position drills ahead of universal, mismatches last", () => {
+    expect(drillsFor("d3", catalog, 3, ["CF"]).map((d) => d.key)).toEqual([
+      "outfield",
+      "universal",
+      "infield",
+    ]);
+  });
+
+  it("keeps catalog order when the player's positions are unknown", () => {
+    expect(drillsFor("d3", catalog, 3, []).map((d) => d.key)).toEqual([
+      "infield",
+      "universal",
+      "outfield",
+    ]);
+  });
+});
+
+describe("suggestForPlayer", () => {
+  const catalog = [
+    drill("field-a", "d3"),
+    drill("field-b", "d3"),
+    drill("focus-a", "d8"),
+  ];
+  const cellsOf = (entries: [BarsKey, number][]) =>
+    new Map<BarsKey, BarsCell>(entries.map(([k, m]) => [k, cell(m)]));
+  const noRoles = { pitcher: false, catcher: false };
+
+  it("pairs each top gap with its best unassigned drill", () => {
+    const s = suggestForPlayer(
+      cellsOf([
+        ["d3", 2],
+        ["d8", 1],
+      ]),
+      noRoles,
+      [],
+      new Set(),
+      catalog,
+    );
+    expect(s.map((x) => [x.gap.dimension, x.drill.key])).toEqual([
+      ["d8", "focus-a"],
+      ["d3", "field-a"],
+    ]);
+  });
+
+  it("skips drills already assigned and never doubles up", () => {
+    const s = suggestForPlayer(
+      cellsOf([["d3", 2]]),
+      noRoles,
+      [],
+      new Set(["field-a"]),
+      catalog,
+    );
+    expect(s.map((x) => x.drill.key)).toEqual(["field-b"]);
+  });
+
+  it("suggests nothing for unrated players", () => {
+    expect(suggestForPlayer(undefined, noRoles, [], new Set(), catalog)).toEqual([]);
+  });
+});
+
+describe("teamGaps", () => {
+  const summaries = new Map<string, Map<BarsKey, BarsCell>>([
+    ["p1", new Map([["d2", cell(2)], ["d8", cell(2)]])],
+    ["p2", new Map([["d2", cell(1)], ["d8", cell(4)]])],
+    ["p3", new Map([["d2", cell(2)], ["d1", cell(2)]])],
+  ]);
+
+  it("counts players below standard per dimension, biggest first", () => {
+    const gaps = teamGaps(summaries);
+    expect(gaps[0]).toMatchObject({ dimension: "d2", below: 3, rated: 3 });
+  });
+
+  it("needs at least two kids below — one kid is his own homework", () => {
+    expect(teamGaps(summaries).map((g) => g.dimension)).not.toContain("d8");
+    expect(teamGaps(summaries).map((g) => g.dimension)).not.toContain("d1");
+  });
+});
+
+describe("searchCatalog", () => {
+  const catalog = [
+    drill("wall", "d3", { title: "Wall ball", fixes: "glove work off a wall" }),
+    drill("tee", "d1", { title: "Tee work", cue: "drive it up the middle" }),
+    drill("breath", "d8", { title: "Reset breath", steps: ["breathe out slowly"] }),
+  ];
+
+  it("matches by title, dimension label, cue, and steps", () => {
+    expect(searchCatalog("wall", catalog).map((d) => d.key)).toEqual(["wall"]);
+    expect(searchCatalog("focus", catalog).map((d) => d.key)).toEqual(["breath"]);
+    expect(searchCatalog("middle", catalog).map((d) => d.key)).toEqual(["tee"]);
+  });
+
+  it("requires every token and ignores case", () => {
+    expect(searchCatalog("WALL glove", catalog).map((d) => d.key)).toEqual(["wall"]);
+    expect(searchCatalog("wall middle", catalog)).toEqual([]);
+    expect(searchCatalog("   ", catalog)).toEqual([]);
   });
 });

@@ -214,18 +214,22 @@ async function main() {
   // A first pass of BARS feedback so the Performance pages (feedback,
   // reports, homework) have life: a few below-standard levels create
   // homework gaps. Fictional demo players only, as always.
+  // Indexes follow PLAYERS order: 0 Milo, 2 Jax, 3 Eli, 4 Sam. Eli gets
+  // the fielding/self-regulation gaps the smoke walks through; Jax and
+  // Sam share a throwing gap so the team-focus panel has a real theme.
   const barsSeed: [number, import("@/lib/bars").BarsKey, number, string][] = [
     [0, "d1", 4, "CD"],
     [0, "d5", 3, "CD"],
     [0, "d8", 3, "AB"],
-    [1, "d1", 3, "CD"],
-    [1, "d3", 2, "CD"],
-    [1, "d6", 2, "AB"],
-    [1, "d8", 2, "CD"],
+    [3, "d1", 3, "CD"],
+    [3, "d3", 2, "CD"],
+    [3, "d6", 2, "AB"],
+    [3, "d8", 2, "CD"],
     [2, "d2", 2, "CD"],
     [2, "d7", 3, "CD"],
-    [3, "d4", 2, "AB"],
-    [3, "d9", 3, "CD"],
+    [4, "d2", 2, "CD"],
+    [4, "d4", 2, "AB"],
+    [4, "d9", 3, "CD"],
   ];
   for (const [idx, dimension, level, rater] of barsSeed) {
     await db.insert(tables.barsRatings).values({
