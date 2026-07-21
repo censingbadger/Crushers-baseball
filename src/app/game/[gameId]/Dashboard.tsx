@@ -160,6 +160,28 @@ export function Dashboard(props: Props) {
   // every device in the dugout shows the same batter.
   const [upSpot, setUpSpotLocal] = useState(game.upSpot);
   useEffect(() => setUpSpotLocal(game.upSpot), [game.upSpot]);
+  // Pitch counts, optimistic: +1/+5 is the app's most-repeated tap, eyes on
+  // the mound — the number must move instantly, not wait for the route
+  // refetch. Re-synced to the server total (which folds in other coaches'
+  // taps) whenever the values actually change, so counts never drift or
+  // double. Keyed on a value hash, not object identity, or the pending
+  // re-render would clobber the optimistic bump before the server responds.
+  const [localPitches, setLocalPitches] = useState<Record<string, number>>(
+    props.gamePitchesByPlayer,
+  );
+  const pitchesKey = JSON.stringify(props.gamePitchesByPlayer);
+  useEffect(() => {
+    setLocalPitches(props.gamePitchesByPlayer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pitchesKey]);
+  const pitchesOf = (pid: string) => localPitches[pid] ?? 0;
+  function bumpPitch(pid: string, delta: number) {
+    setLocalPitches((m) => ({ ...m, [pid]: Math.max(0, (m[pid] ?? 0) + delta) }));
+    startTransition(async () => {
+      await addPitches(game.id, pid, delta);
+      router.refresh();
+    });
+  }
   // Pitching plan, prefilled from each inning's current pitcher.
   const [plan, setPlan] = useState<(string | null)[]>(() =>
     Array.from({ length: game.innings }, (_, i) => props.pitcherByInning[i + 1] ?? null),
@@ -577,6 +599,13 @@ export function Dashboard(props: Props) {
                 <button
                   key={pos}
                   data-drop={pos}
+                  aria-label={
+                    pid
+                      ? `${pos}: ${nameOf(pid)}${
+                          pos === "P" && !board ? `, ${pitchesOf(pid)} pitches` : ""
+                        }`
+                      : `${pos} — empty, tap to place a player`
+                  }
                   style={{ ...SLOT_POS[pos], touchAction: "none" }}
                   onPointerDown={pid ? (e) => chipPointerDown(e, pid) : undefined}
                   onClick={() => {
@@ -613,7 +642,7 @@ export function Dashboard(props: Props) {
                   )}
                   {pos === "P" && pid && !board && (
                     <span className="block text-[11px] font-semibold">
-                      {props.gamePitchesByPlayer[pid] ?? 0} p · {eligibility[pid]?.remaining ?? 0} left
+                      {pitchesOf(pid)} p · {eligibility[pid]?.remaining ?? 0} left
                     </span>
                   )}
                 </button>
@@ -621,29 +650,35 @@ export function Dashboard(props: Props) {
             })}
           </div>
 
-          {/* Pitch counter for the current pitcher (coach view only) */}
+          {/* Pitch counter for the current pitcher (coach view only). The
+              +1 is the single most-repeated tap in this no-score app —
+              big targets, tapped one-handed with eyes on the mound, and
+              -1 pushed away so a fat-finger +1 can't decrement. */}
           {pitcherId && !board && (
             <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-paper p-2">
               <span className="text-sm font-bold">
-                ⚾ {nameOf(pitcherId)} — {props.gamePitchesByPlayer[pitcherId] ?? 0} pitches
+                ⚾ {nameOf(pitcherId)} — {pitchesOf(pitcherId)} pitches
                 <span className="ml-1 text-xs font-semibold text-neutral-600">
                   ({eligibility[pitcherId]?.remaining ?? 0} left today)
                 </span>
               </span>
-              {[1, 5, -1].map((d) => (
+              {[1, 5].map((d) => (
                 <button
                   key={d}
-                  className={`btn px-3 py-1 text-sm ${d === 1 ? "btn-primary" : ""}`}
-                  onClick={() =>
-                    startTransition(async () => {
-                      await addPitches(game.id, pitcherId, d);
-                      router.refresh();
-                    })
-                  }
+                  className={`btn h-12 min-w-14 text-lg ${d === 1 ? "btn-primary" : ""}`}
+                  aria-label={`Add ${d} pitch${d > 1 ? "es" : ""} for ${nameOf(pitcherId)}`}
+                  onClick={() => bumpPitch(pitcherId, d)}
                 >
-                  {d > 0 ? `+${d}` : d}
+                  +{d}
                 </button>
               ))}
+              <button
+                className="btn ml-3 h-12 min-w-14 text-lg"
+                aria-label={`Subtract a pitch for ${nameOf(pitcherId)}`}
+                onClick={() => bumpPitch(pitcherId, -1)}
+              >
+                −1
+              </button>
               {(eligibility[pitcherId]?.remaining ?? 1) <= 10 && (
                 <span className="rounded border border-line bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
                   {eligibility[pitcherId]?.remaining === 0 ? "AT THE CAP" : "NEAR THE CAP"}
@@ -671,6 +706,7 @@ export function Dashboard(props: Props) {
                 <button
                   key={pid}
                   style={{ touchAction: "none" }}
+                  aria-label={`${nameOf(pid)} on the bench — tap to select, then tap a position`}
                   onPointerDown={(e) => chipPointerDown(e, pid)}
                   onClick={() => {
                     if (suppressClick.current) return;
@@ -908,7 +944,7 @@ export function Dashboard(props: Props) {
               <span className="flex items-center gap-1.5">
                 {props.battingOrder.length > 0 && (
                   <button
-                    className={`btn ${board ? "px-2.5 py-1 text-xs" : "px-2 py-0.5 text-xs"}`}
+                    className={`btn min-h-[40px] ${board ? "px-4 py-2.5 text-base" : "px-3 py-2 text-sm"}`}
                     disabled={pending}
                     data-testid="next-batter"
                     onClick={() => {
@@ -1006,22 +1042,24 @@ export function Dashboard(props: Props) {
                       {current[o.playerId] === BENCH ? "bench" : current[o.playerId]}
                     </span>
                     {!board && (
-                      <>
+                      <span className="flex shrink-0 items-center gap-1.5">
                         <button
-                          className="rounded-lg border border-line-strong px-2.5 py-1.5 text-sm leading-none"
+                          className="flex h-10 min-w-10 items-center justify-center rounded-lg border border-line-strong text-base leading-none"
+                          aria-label={`Move ${nameOf(o.playerId)} up in the batting order`}
                           onClick={() => startTransition(async () => { await swapBattingSpot(game.id, o.playerId, "up"); router.refresh(); })}
                           disabled={i === 0}
                         >
                           ↑
                         </button>
                         <button
-                          className="rounded-lg border border-line-strong px-2.5 py-1.5 text-sm leading-none"
+                          className="flex h-10 min-w-10 items-center justify-center rounded-lg border border-line-strong text-base leading-none"
+                          aria-label={`Move ${nameOf(o.playerId)} down in the batting order`}
                           onClick={() => startTransition(async () => { await swapBattingSpot(game.id, o.playerId, "down"); router.refresh(); })}
                           disabled={i === props.battingOrder.length - 1}
                         >
                           ↓
                         </button>
-                      </>
+                      </span>
                     )}
                   </li>
                 );

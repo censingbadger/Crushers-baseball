@@ -108,7 +108,7 @@ export function DepthGrid({
                         <span className="absolute left-0.5 top-0 text-[9px]">★</span>
                       )}
                       {ability !== undefined && (
-                        <span className="absolute bottom-0 right-0.5 text-[9px] font-semibold opacity-60">
+                        <span className="absolute bottom-0 right-0.5 text-[11px] font-bold">
                           {Math.round(ability)}
                         </span>
                       )}

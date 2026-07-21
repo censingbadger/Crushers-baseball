@@ -59,6 +59,14 @@ describe("planMove", () => {
   it("no-op when target equals current slot", () => {
     expect(planMove(current, "a", "C", 1, 6).set).toEqual([]);
   });
+
+  it("writes an extra inning when from==to beyond regulation", () => {
+    // The dugout bounds moves by max(currentInning, innings), so a move in
+    // inning 7 of a 6-inning game must still emit rows (was a silent no-op).
+    const plan = planMove(current, "c", "C", 7, 7);
+    expect(plan.set).toContainEqual({ inning: 7, playerId: "c", position: "C" });
+    expect(plan.set).toContainEqual({ inning: 7, playerId: "a", position: BENCH });
+  });
 });
 
 describe("emptyPositions", () => {
