@@ -240,7 +240,7 @@ export default async function HomeworkPage() {
                 <span className="chip bg-paper text-neutral-500">not rated yet</span>
               )}
               {open.length > 0 && (
-                <span className="chip bg-team-orange text-paper">
+                <span className="chip bg-team-orange text-ink">
                   {open.length} assigned
                 </span>
               )}

@@ -126,7 +126,7 @@ export default async function PlayerEditPage({
                     r === undefined
                       ? "text-neutral-400"
                       : r >= 8
-                        ? "bg-team-orange text-paper"
+                        ? "bg-team-orange text-ink"
                         : r >= 6
                           ? "bg-team-blue"
                           : r >= 4

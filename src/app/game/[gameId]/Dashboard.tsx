@@ -614,7 +614,7 @@ export function Dashboard(props: Props) {
                   }}
                   className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-lg border-2 px-2 py-1 text-center shadow ${
                     sel
-                      ? "border-team-orange bg-team-orange text-paper"
+                      ? "border-team-orange bg-team-orange text-ink"
                       : empty
                         ? "border-dashed border-white bg-white/20 text-white"
                         : "border-ink bg-paper"
@@ -714,7 +714,7 @@ export function Dashboard(props: Props) {
                   }}
                   className={`rounded-lg border-2 px-2 py-1 text-sm font-bold ${
                     selected === pid
-                      ? "border-team-orange bg-team-orange text-paper"
+                      ? "border-team-orange bg-team-orange text-ink"
                       : "border-ink bg-team-blue-light"
                   } ${drag?.armed && drag.pid === pid ? "opacity-40" : ""}`}
                 >
@@ -1023,7 +1023,7 @@ export function Dashboard(props: Props) {
                         {nameOf(o.playerId)}
                       </span>
                       {isUp && (
-                        <span className="shrink-0 rounded border border-team-orange-dark bg-team-orange px-1.5 py-0.5 text-[11px] font-extrabold uppercase text-paper">
+                        <span className="shrink-0 rounded border border-team-orange-dark bg-team-orange px-1.5 py-0.5 text-[11px] font-extrabold uppercase text-ink">
                           Up
                         </span>
                       )}

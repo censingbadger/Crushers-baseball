@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb, tables } from "@/db";
 import type { Position } from "@/db/schema";
 
@@ -8,6 +8,39 @@ export interface CurrentRating {
   rater: string;
   rating: number;
   createdAt: Date;
+  createdByUserId: string | null;
+}
+
+/**
+ * A rating's source identity: the coach who entered it when known, else
+ * the typed/imported label. Two staff can share initials (e.g. two "MC"),
+ * so keying on the label alone would let one silently supersede the
+ * other; keying on the coach fixes that. The manual matrix — where one
+ * signed-in coach fills several raters' columns under different labels —
+ * still works because those rows differ by label (same user, different
+ * label → distinct identity).
+ */
+export function raterIdentity(r: {
+  rater: string;
+  createdByUserId: string | null;
+}): string {
+  return `${r.rater}|${r.createdByUserId ?? ""}`;
+}
+
+/**
+ * Reduce newest-first rating rows to the current matrix: the latest per
+ * (player, position, rater-identity). Pure, so the dedup is unit-tested.
+ */
+export function dedupeCurrentRatings(rows: CurrentRating[]): CurrentRating[] {
+  const seen = new Set<string>();
+  const current: CurrentRating[] = [];
+  for (const r of rows) {
+    const key = `${r.playerId}|${r.position}|${raterIdentity(r)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    current.push(r);
+  }
+  return current;
 }
 
 /**
@@ -23,19 +56,12 @@ export async function getCurrentRatings(seasonId: string): Promise<CurrentRating
       rater: tables.positionRatings.rater,
       rating: tables.positionRatings.rating,
       createdAt: tables.positionRatings.createdAt,
+      createdByUserId: tables.positionRatings.createdByUserId,
     })
     .from(tables.positionRatings)
     .where(eq(tables.positionRatings.seasonId, seasonId))
     .orderBy(desc(tables.positionRatings.createdAt));
-  const seen = new Set<string>();
-  const current: CurrentRating[] = [];
-  for (const r of rows) {
-    const key = `${r.playerId}|${r.position}|${r.rater}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    current.push(r);
-  }
-  return current;
+  return dedupeCurrentRatings(rows);
 }
 
 export function listRaters(ratings: CurrentRating[]): string[] {
@@ -90,6 +116,9 @@ export async function insertRatingIfChanged(params: {
   createdByUserId?: string;
 }): Promise<boolean> {
   const db = await getDb();
+  // Compare against THIS coach's own latest, not just anyone filed under
+  // the same initials — so a same-initials coworker's value can't make a
+  // real change look unchanged and get dropped.
   const [latest] = await db
     .select({ rating: tables.positionRatings.rating })
     .from(tables.positionRatings)
@@ -99,6 +128,9 @@ export async function insertRatingIfChanged(params: {
         eq(tables.positionRatings.playerId, params.playerId),
         eq(tables.positionRatings.position, params.position),
         eq(tables.positionRatings.rater, params.rater),
+        params.createdByUserId
+          ? eq(tables.positionRatings.createdByUserId, params.createdByUserId)
+          : isNull(tables.positionRatings.createdByUserId),
       ),
     )
     .orderBy(desc(tables.positionRatings.createdAt))

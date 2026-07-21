@@ -36,14 +36,17 @@ export default async function RateIndexPage() {
       rater: tables.barsRatings.rater,
       level: tables.barsRatings.level,
       day: tables.barsRatings.day,
+      createdByUserId: tables.barsRatings.createdByUserId,
     })
     .from(tables.barsRatings)
     .where(eq(tables.barsRatings.seasonId, season.id));
 
   // My coverage per dimension: distinct players I've observed, latest day.
+  // Keyed on my identity so a same-initials coworker's rows aren't "mine".
   const mine = new Map<string, { players: Set<string>; lastDay: string }>();
   for (const r of rows) {
-    if (r.rater !== rater || r.level === NOT_OBSERVED) continue;
+    if (r.rater !== rater || r.createdByUserId !== user.id || r.level === NOT_OBSERVED)
+      continue;
     const cur = mine.get(r.dimension) ?? { players: new Set(), lastDay: "" };
     cur.players.add(r.playerId);
     if (r.day > cur.lastDay) cur.lastDay = r.day;

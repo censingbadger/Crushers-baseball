@@ -17,10 +17,11 @@ export default async function QuickMatrixPage() {
     getCurrentRatings(season.id),
   ]);
 
-  // Prefill only this coach's own column — same as their tab on the grid.
+  // Prefill only this coach's own column — keyed on his identity, not the
+  // bare initials, so a same-initials coworker's numbers never bleed in.
   const mine: Record<string, Record<string, number>> = {};
   for (const r of ratings) {
-    if (r.rater !== rater) continue;
+    if (r.rater !== rater || r.createdByUserId !== user.id) continue;
     (mine[r.playerId] ??= {})[r.position] = r.rating;
   }
 

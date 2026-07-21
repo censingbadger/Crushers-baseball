@@ -75,7 +75,7 @@ export default async function ReportsPage({
             key={m}
             href={`/reports?month=${m}`}
             className={`rounded border border-line px-2.5 py-1 text-sm font-bold ${
-              m === month ? "bg-team-orange text-paper" : "bg-paper hover:bg-team-blue-light"
+              m === month ? "bg-team-orange text-ink" : "bg-paper hover:bg-team-blue-light"
             }`}
           >
             {monthLabel(m)}

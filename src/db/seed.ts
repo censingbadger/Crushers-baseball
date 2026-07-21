@@ -75,12 +75,15 @@ async function main() {
     })
     .returning();
 
-  await db.insert(tables.users).values({
-    email: DEMO_COACH.email,
-    passwordHash: bcrypt.hashSync(DEMO_COACH.password, 10),
-    displayName: "Coach Demo",
-    role: "coach",
-  });
+  const [coachUser] = await db
+    .insert(tables.users)
+    .values({
+      email: DEMO_COACH.email,
+      passwordHash: bcrypt.hashSync(DEMO_COACH.password, 10),
+      displayName: "Coach Demo",
+      role: "coach",
+    })
+    .returning();
 
   const playerIds: string[] = [];
   for (const p of PLAYERS) {
@@ -196,7 +199,11 @@ async function main() {
     note: "bringing a glove",
   });
 
-  // Two demo coaches' position ratings so the matrix has life.
+  // Two demo coaches' position ratings so the matrix has life. "CD" is
+  // the demo coach who logs in, so his rows carry his user id — that's
+  // his identity everywhere (getCurrentRatings/quick entry key on
+  // rater+user, so a same-initials coworker can't overwrite him). "AB"
+  // is a fictional coach with no login, left unowned.
   for (const [raterIdx, rater] of ["AB", "CD"].entries()) {
     for (let i = 0; i < playerIds.length; i++) {
       for (let j = 0; j < POSITIONS.length; j++) {
@@ -206,6 +213,7 @@ async function main() {
           position: POSITIONS[j],
           rating: ((i * 3 + j * 5 + raterIdx) % 9) + 1,
           rater,
+          createdByUserId: rater === "CD" ? coachUser.id : null,
         });
       }
     }
@@ -239,6 +247,7 @@ async function main() {
       rater,
       level,
       day: isoDay(-2),
+      createdByUserId: rater === "CD" ? coachUser.id : null,
     });
   }
 

@@ -184,7 +184,7 @@ function StatusChip({ status }: { status: string }) {
     );
   }
   return (
-    <span className="shrink-0 rounded border border-line bg-team-orange px-1.5 py-0.5 text-xs font-bold text-paper">
+    <span className="shrink-0 rounded border border-line bg-team-orange px-1.5 py-0.5 text-xs font-bold text-ink">
       Full
     </span>
   );
@@ -318,7 +318,7 @@ function PlayerCard({
                     v === undefined
                       ? "text-neutral-400"
                       : v >= 8
-                        ? "bg-team-orange text-paper"
+                        ? "bg-team-orange text-ink"
                         : v >= 6
                           ? "bg-team-blue"
                           : v >= 4
@@ -443,7 +443,7 @@ function PositionChips({
             title={primary ? "Primary (depth chart)" : "Secondary (depth chart)"}
             className={`rounded border px-1 py-0.5 text-xs font-bold ${
               primary
-                ? "border-team-orange-dark bg-team-orange text-paper"
+                ? "border-team-orange-dark bg-team-orange text-ink"
                 : "border-team-blue-dark bg-team-blue"
             }`}
           >

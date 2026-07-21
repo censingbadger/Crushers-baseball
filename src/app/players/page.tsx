@@ -81,7 +81,7 @@ export default async function PlayersPage() {
                     <span className="ml-1.5 text-team-blue-dark">#{p.jerseyNumber}</span>
                   )}
                   {canOpen && (
-                    <span className="chip ml-2 bg-team-orange text-paper">
+                    <span className="chip ml-2 bg-team-orange text-ink">
                       {user.role === "coach" ? "open" : "yours"}
                     </span>
                   )}

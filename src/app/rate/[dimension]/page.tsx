@@ -43,9 +43,13 @@ export default async function RateDimensionPage({
     .orderBy(tables.barsRatings.createdAt);
 
   // My latest entry per player (any level incl. not-observed) — prefill.
+  // Keyed on my identity (user + label), so a same-initials coworker's
+  // observation never shows as mine.
   const mine: Record<string, { level: number; day: string }> = {};
   for (const r of rows) {
-    if (r.rater === rater) mine[r.playerId] = { level: r.level, day: r.day };
+    if (r.rater === rater && r.createdByUserId === user.id) {
+      mine[r.playerId] = { level: r.level, day: r.day };
+    }
   }
 
   const youngest = youngestQuartile(roster);

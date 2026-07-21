@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { DepthGrid } from "./DepthGrid";
 
 const LEGEND: { letter: string; name: string; blurb: string; cls: string }[] = [
-  { letter: "P", name: "Primary", blurb: "where we want him", cls: "bg-team-orange text-paper border-team-orange-dark" },
+  { letter: "P", name: "Primary", blurb: "where we want him", cls: "bg-team-orange text-ink border-team-orange-dark" },
   { letter: "S", name: "Secondary", blurb: "fine anytime", cls: "bg-team-blue border-team-blue-dark" },
   { letter: "D", name: "Develop", blurb: "reps when the game allows", cls: "bg-team-blue-light border-line" },
   { letter: "E", name: "Emergency", blurb: "only if we must, or up big", cls: "bg-paper text-neutral-500 border-dashed border-line" },
